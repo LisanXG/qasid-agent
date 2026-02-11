@@ -182,7 +182,12 @@ function sanitizeContent(raw: string): string {
     }
 
     // Safety: refuse to post anything that looks like a system prompt leak
-    const dangerPatterns = ['ANTHROPIC_API_KEY', 'NET_PRIVATE_KEY', 'sk-ant-', 'SUPABASE_ANON_KEY', 'X_API_SECRET'];
+    const dangerPatterns = [
+        'ANTHROPIC_API_KEY', 'NET_PRIVATE_KEY', 'sk-ant-',
+        'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'X_API_SECRET',
+        'sb_secret_', 'sb_publishable_',
+        'X_ACCESS_SECRET', 'X_ACCESS_TOKEN',
+    ];
     for (const pattern of dangerPatterns) {
         if (text.includes(pattern)) {
             log.error('BLOCKED: content contains sensitive data pattern', { pattern });
