@@ -2,112 +2,47 @@
 
 > **قاصد** (*Qasid*) = Messenger in Arabic
 
-Autonomous AI Chief Marketing Officer for [Lisan Holdings](https://lisanholdings.dev). Runs 24/7, posts to X and [Botchan](https://netprotocol.app), with its brain stored permanently on-chain via [Net Protocol](https://netprotocol.app) (Base L2).
+Autonomous AI Chief Marketing Officer for [Lisan Holdings](https://lisanholdings.dev).
+
+Runs 24/7 — posts to [X](https://x.com/QasidAI_), cross-posts to [Botchan](https://netprotocol.app), with its brain stored permanently on-chain via [Net Protocol](https://netprotocol.app) on Base L2.
 
 ---
 
 ## What It Does
 
-- **Generates content** using Claude Haiku with live data from [LISAN INTELLIGENCE](https://lisanintel.com)
-- **Posts to X** on a 4x/day schedule (8 AM, 2 PM, 6 PM, 10 PM UTC)
-- **Cross-posts to Botchan** (Net Protocol's on-chain feed) — 1x/day
-- **Self-learning engine** — scores post performance, adapts content strategy weights weekly
-- **On-chain brain** — personality, brand knowledge, profile, and daily summaries stored on Base L2
+- 🧠 **Generates original content** powered by live data from [LISAN INTELLIGENCE](https://lisanintel.com)
+- 📡 **Posts to X** on a 4x/day schedule — signal scorecards, builder narratives, market takes
+- ⛓️ **On-chain brain** — personality, brand knowledge, and daily summaries stored on Base L2
+- 📊 **Self-learning engine** — scores post performance, adapts content strategy weights weekly
+- 🔗 **Cross-posts to Botchan** — Net Protocol's on-chain social feed
 
-## Architecture
+## Tech Stack
 
-```
-src/
-├── config.ts              # Zod-validated env config
-├── index.ts               # CLI entry point
-├── logger.ts              # Structured logger
-├── supabase.ts            # Shared Supabase client (service_role)
-├── data/
-│   ├── intelligence.ts    # LISAN INTELLIGENCE API client
-│   └── market.ts          # CoinGecko trending data
-├── engine/
-│   ├── content.ts         # Content generation pipeline
-│   ├── llm.ts             # Claude Haiku client
-│   └── memory.ts          # Post history + dedup
-├── learning/
-│   ├── scorer.ts          # Performance scoring (24h window)
-│   ├── tracker.ts         # Engagement metric updates
-│   ├── weights.ts         # Adaptive strategy weights
-│   └── meta-review.ts     # Weekly performance analysis
-├── net/
-│   ├── brain.ts           # On-chain brain manager
-│   ├── client.ts          # Net Protocol client (Storage + Botchan)
-│   ├── daily-summary.ts   # End-of-day on-chain digest
-│   ├── generate-wallet.ts # One-time wallet generator
-│   └── profile.ts         # On-chain agent identity
-├── personality/
-│   ├── brand-knowledge.ts # Lisan Holdings product data
-│   └── system-prompt.ts   # QasidAI voice and rules
-├── platforms/
-│   └── x.ts               # X (Twitter) API v2 client
-└── scheduler/
-    └── cron.ts            # Cron job orchestrator
-```
-
-## Setup
-
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Copy env template and fill in your values
-cp .env.example .env
-
-# 3. Run Supabase migration (in Supabase SQL editor)
-# → paste contents of supabase/migration.sql
-
-# 4. Generate a wallet for on-chain brain (optional)
-npx tsx src/net/generate-wallet.ts
-
-# 5. Test content generation (dry run)
-npx tsx src/index.ts test
-
-# 6. Start the scheduler
-npx tsx src/index.ts
-```
-
-## CLI Commands
-
-| Command | Description |
+| Layer | Technology |
 |---|---|
-| `npx tsx src/index.ts` | Start scheduler (4 posts/day + learning) |
-| `npx tsx src/index.ts test` | Generate a sample post (no posting) |
-| `npx tsx src/index.ts once` | Single X post cycle |
-| `npx tsx src/index.ts once-botchan` | Single X + Botchan post cycle |
-| `npx tsx src/index.ts botchan-post <topic> <msg>` | Post to a specific Botchan topic |
-| `npx tsx src/index.ts net-upload` | Upload brain to Net Protocol |
-| `npx tsx src/index.ts net-profile` | Upload agent profile to Net Protocol |
-| `npx tsx src/index.ts net-read` | Read all on-chain brain data |
-| `npx tsx src/index.ts net-status` | Show Net Protocol status |
-| `npx tsx src/index.ts net-summary` | Write daily summary on-chain |
+| LLM | Anthropic Claude Haiku |
+| Social | X (Twitter) API v2 |
+| On-Chain | Net Protocol (Base L2) — Storage + Botchan |
+| Database | Supabase (PostgreSQL) |
+| Hosting | Railway |
+| Language | TypeScript / Node.js |
 
-## Environment Variables
+## How It Works
 
-See [.env.example](.env.example) for the full list. Key variables:
+QasidAI operates as a fully autonomous marketing agent:
 
-| Variable | Required | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | ✅ | Claude API key |
-| `SUPABASE_URL` | ✅ | Supabase project URL |
-| `SUPABASE_ANON_KEY` | ✅ | Supabase anon key (fallback) |
-| `SUPABASE_SERVICE_ROLE_KEY` | ⚠️ | Supabase service role key (recommended for RLS) |
-| `X_API_KEY` + secrets | ✅ | X API v2 credentials |
-| `NET_PRIVATE_KEY` | Optional | Wallet private key for on-chain brain |
-| `POSTING_ENABLED` | ✅ | Set to `true` to go live (default: `false` = dry run) |
+1. **Content Generation** — Pulls live market data and signal performance from LISAN INTELLIGENCE, then generates contextual posts using an LLM with a carefully crafted system prompt
+2. **Multi-Platform Distribution** — Posts to X and cross-posts to Botchan (Net Protocol's on-chain feed)
+3. **Learning Loop** — After 24 hours, scores each post's engagement (reactions, replies, clicks), adjusts content type weights, and runs weekly meta-reviews
+4. **On-Chain Memory** — Stores its personality, brand knowledge, strategy snapshots, and daily summaries on Base L2 via Net Protocol for permanent verifiability
 
-## Security
+## Links
 
-- All secrets loaded from `.env` (gitignored)
-- Content sanitization blocks API key leaks in LLM output
-- `POSTING_ENABLED=false` by default (safe dry run)
-- Supabase RLS restricted to `service_role` only
-- Global error handlers prevent silent crashes
+- 🐦 **QasidAI on X**: [@QasidAI_](https://x.com/QasidAI_)
+- 🏢 **Lisan Holdings**: [lisanholdings.dev](https://lisanholdings.dev)
+- 📊 **LISAN INTELLIGENCE**: [lisanintel.com](https://lisanintel.com)
+- 👤 **Founder**: [@lisantherealone](https://x.com/lisantherealone)
 
 ---
 
-Built by [Lisan](https://x.com/lisantherealone) · [lisanholdings.dev](https://lisanholdings.dev)
+© 2026 Lisan Holdings. All rights reserved. See [LICENSE](LICENSE) for details.
