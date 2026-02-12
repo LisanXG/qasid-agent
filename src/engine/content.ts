@@ -4,6 +4,7 @@ import { gatherMarketContext } from '../data/market.js';
 import { createLogger } from '../logger.js';
 import { contentTypes, type ContentType } from '../personality/system-prompt.js';
 import { addContextualMentions } from './contextual-mentions.js';
+import { supabase } from '../supabase.js';
 
 // ============================================================================
 // QasidAI — Content Generation Engine
@@ -79,18 +80,42 @@ export function pickContentType(weights?: Partial<Record<ContentType, number>>):
 function buildGenerationPrompt(
     contentType: ContentType,
     intelContext: string,
+    exclusions?: string,
 ): string {
-    return `Generate a ${contentType.replace(/_/g, ' ')} post.
+    const brandInfo = `BRAND: QasidAI is the autonomous CMO of Lisan Holdings. Products: LISAN Intelligence (AI trading signals), QasidAI (this agent), SigmaPips (Telegram signals), Net Protocol (on-chain storage).`;
+    const typeGuidance = `CONTENT TYPE: ${contentType.replace(/_/g, ' ')} — write ONE tweet (max 270 chars).`;
+    const antiSlop = `RULES: No hashtags. No emojis at start. No 'just', 'exciting', 'incredible'. No corporate speak. Sound like a sharp crypto native, not a press release.`;
+    const exclusionBlock = exclusions ? `\n\nAVOID REPEATING — here are recent posts (write something DIFFERENT):\n${exclusions}` : '';
 
-For X/Twitter. Keep under 280 characters. No hashtags. Punchy and direct. Write like a real person on crypto twitter — not like an AI.
+    return `${brandInfo}\n\n${typeGuidance}\n\n${antiSlop}\n\nLIVE DATA:\n${intelContext.slice(0, 600)}${exclusionBlock}\n\nWrite the tweet now. Output ONLY the tweet text, nothing else.`;
+}
 
-ANTI-SLOP REMINDER: Do NOT use any banned phrases from your instructions. No "dive in", "game changer", "unlock", "the future of", "buckle up", "here's the thing", "don't sleep on". Write like a HUMAN, not a marketing bot.
+/**
+ * Fetches recent posts to use as exclusion criteria for the LLM,
+ * preventing repetition.
+ */
+async function getRecentPostExclusions(): Promise<string> {
+    try {
+        const { data, error } = await supabase
+            .from('qasid_posts')
+            .select('content')
+            .order('posted_at', { ascending: false })
+            .limit(5);
 
-Here is current live data from Lisan Intelligence to reference (use real numbers if relevant):
+        if (error) {
+            log.error('Error fetching recent posts for exclusion', { error: error.message });
+            return '';
+        }
 
-${intelContext}
+        if (!data || data.length === 0) {
+            return '';
+        }
 
-Generate ONLY the post content. No preamble, no explanation, no quotes around it. Just the raw post text ready to publish.`;
+        return data.map(post => `- ${post.content}`).join('\n');
+    } catch (e) {
+        log.error('Exception fetching recent posts for exclusion', { error: String(e) });
+        return '';
+    }
 }
 
 /**
@@ -109,10 +134,13 @@ export async function generatePost(
         gatherMarketContext().catch(() => ''),
     ]);
     const combinedContext = [intelContext, marketContext].filter(Boolean).join('\n\n');
-    const prompt = buildGenerationPrompt(contentType, combinedContext);
-    const timeContext = getTimeContext();
-
     log.info(`Generating ${contentType} for X`);
+
+    // Fetch recent posts for exclusion-based dedup
+    const exclusions = await getRecentPostExclusions();
+
+    const prompt = buildGenerationPrompt(contentType, combinedContext, exclusions);
+    const timeContext = getTimeContext();
 
     const result = await generate({
         prompt,

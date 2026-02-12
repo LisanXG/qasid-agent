@@ -81,10 +81,14 @@ export async function saveWeights(weights: StrategyWeights): Promise<void> {
 
 /**
  * Run the daily weight adaptation cycle.
- * Analyzes recent post performance and adjusts content type weights.
+ * Analyzes recent post performance and adjusts ALL weight dimensions:
+ * - content_type_weights: Which content types perform best
+ * - time_weights: Which hours of day get highest engagement
+ * - tone_weights: Which tones resonate most
+ * - topic_weights: Which topics drive engagement
  */
 export async function adaptWeights(): Promise<void> {
-    log.info('Running daily weight adaptation...');
+    log.info('Running daily weight adaptation (all dimensions)...');
 
     // Get scored posts from the last 7 days
     const { data: posts, error } = await supabase
@@ -100,8 +104,9 @@ export async function adaptWeights(): Promise<void> {
     }
 
     const currentWeights = await loadWeights();
+    const overallAvg = posts.reduce((s, p) => s + p.performance_score, 0) / posts.length;
 
-    // Calculate average performance score per content type
+    // ---- 1. Content Type Weights ----
     const typeScores: Record<string, { total: number; count: number }> = {};
     for (const post of posts) {
         const type = post.content_type;
@@ -110,35 +115,77 @@ export async function adaptWeights(): Promise<void> {
         typeScores[type].count++;
     }
 
-    // Calculate overall average for comparison
-    const overallAvg = posts.reduce((s, p) => s + p.performance_score, 0) / posts.length;
-
-    // Adjust weights: above-average types get boosted, below-average get reduced
     for (const type of contentTypes) {
         const stats = typeScores[type];
-        if (!stats || stats.count < 2) continue; // Need at least 2 data points
+        if (!stats || stats.count < 2) continue;
 
         const typeAvg = stats.total / stats.count;
         const diff = typeAvg - overallAvg;
-
-        // Nudge the weight proportionally to the performance difference
         const currentWeight = currentWeights.content_type_weights[type] || 10;
         const newWeight = currentWeight + diff * LEARNING_RATE;
-
-        // Clamp to MIN/MAX range
         currentWeights.content_type_weights[type] = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, Math.round(newWeight)));
     }
 
-    // Normalize weights to sum to 100
+    // Normalize content type weights to sum to 100
     const totalWeight = Object.values(currentWeights.content_type_weights).reduce((a, b) => a + b, 0);
     if (totalWeight > 0) {
         for (const type of contentTypes) {
-            currentWeights.content_type_weights[type] = Math.round(
-                (currentWeights.content_type_weights[type] / totalWeight) * 100
+            currentWeights.content_type_weights[type] = Math.max(
+                MIN_WEIGHT,
+                Math.round((currentWeights.content_type_weights[type] / totalWeight) * 100),
             );
-            // Re-clamp after normalization
-            currentWeights.content_type_weights[type] = Math.max(MIN_WEIGHT, currentWeights.content_type_weights[type]);
         }
+    }
+
+    // ---- 2. Time Weights (by UTC hour) ----
+    const hourScores: Record<string, { total: number; count: number }> = {};
+    for (const post of posts) {
+        const hour = new Date(post.posted_at).getUTCHours().toString().padStart(2, '0');
+        if (!hourScores[hour]) hourScores[hour] = { total: 0, count: 0 };
+        hourScores[hour].total += post.performance_score;
+        hourScores[hour].count++;
+    }
+
+    for (const [hour, stats] of Object.entries(hourScores)) {
+        if (stats.count < 2) continue;
+        const hourAvg = stats.total / stats.count;
+        const current = currentWeights.time_weights[hour] ?? 10;
+        const diff = hourAvg - overallAvg;
+        currentWeights.time_weights[hour] = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, Math.round(current + diff * LEARNING_RATE)));
+    }
+
+    // ---- 3. Tone Weights ----
+    const toneScores: Record<string, { total: number; count: number }> = {};
+    for (const post of posts) {
+        if (!post.tone) continue;
+        if (!toneScores[post.tone]) toneScores[post.tone] = { total: 0, count: 0 };
+        toneScores[post.tone].total += post.performance_score;
+        toneScores[post.tone].count++;
+    }
+
+    for (const [tone, stats] of Object.entries(toneScores)) {
+        if (stats.count < 2) continue;
+        const toneAvg = stats.total / stats.count;
+        const current = currentWeights.tone_weights[tone] ?? 10;
+        const diff = toneAvg - overallAvg;
+        currentWeights.tone_weights[tone] = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, Math.round(current + diff * LEARNING_RATE)));
+    }
+
+    // ---- 4. Topic Weights ----
+    const topicScores: Record<string, { total: number; count: number }> = {};
+    for (const post of posts) {
+        if (!post.topic) continue;
+        if (!topicScores[post.topic]) topicScores[post.topic] = { total: 0, count: 0 };
+        topicScores[post.topic].total += post.performance_score;
+        topicScores[post.topic].count++;
+    }
+
+    for (const [topic, stats] of Object.entries(topicScores)) {
+        if (stats.count < 2) continue;
+        const topicAvg = stats.total / stats.count;
+        const current = currentWeights.topic_weights[topic] ?? 10;
+        const diff = topicAvg - overallAvg;
+        currentWeights.topic_weights[topic] = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, Math.round(current + diff * LEARNING_RATE)));
     }
 
     await saveWeights(currentWeights);
@@ -146,32 +193,68 @@ export async function adaptWeights(): Promise<void> {
     // Snapshot strategy to Net Protocol (on-chain brain)
     await snapshotStrategy(currentWeights);
 
-    log.info('Weight adaptation complete', {
+    log.info('Weight adaptation complete (all dimensions)', {
         overallAvg: Math.round(overallAvg),
+        postsAnalyzed: posts.length,
         topTypes: Object.entries(currentWeights.content_type_weights)
             .sort(([, a], [, b]) => b - a)
             .slice(0, 3)
             .map(([type, weight]) => `${type}:${weight}`)
             .join(', '),
+        topHours: Object.entries(currentWeights.time_weights)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 3)
+            .map(([h, w]) => `${h}:00=${w}`)
+            .join(', ') || 'not enough data',
+        topTones: Object.entries(currentWeights.tone_weights)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 2)
+            .map(([t, w]) => `${t}:${w}`)
+            .join(', ') || 'not enough data',
     });
 }
 
 /**
  * Generate a strategy context string for injection into the system prompt.
+ * Now includes all 4 weight dimensions.
  */
 export async function getStrategyContext(): Promise<string> {
     const weights = await loadWeights();
-    const sorted = Object.entries(weights.content_type_weights)
+
+    // Content type rankings
+    const sortedTypes = Object.entries(weights.content_type_weights)
         .sort(([, a], [, b]) => b - a);
+    const topTypes = sortedTypes.slice(0, 3);
+    const bottomTypes = sortedTypes.slice(-3);
 
-    const topTypes = sorted.slice(0, 3);
-    const bottomTypes = sorted.slice(-3);
+    const sections: string[] = [
+        `CONTENT TYPES (prioritize top, reduce bottom):`,
+        `  Best: ${topTypes.map(([t, w]) => `${t.replace(/_/g, ' ')} (${w})`).join(', ')}`,
+        `  Worst: ${bottomTypes.map(([t, w]) => `${t.replace(/_/g, ' ')} (${w})`).join(', ')}`,
+    ];
 
-    return `Based on recent performance data, prioritize these content types:
-${topTypes.map(([type, weight]) => `- ${type.replace(/_/g, ' ')} (weight: ${weight})`).join('\n')}
+    // Time of day insights
+    const timeEntries = Object.entries(weights.time_weights).sort(([, a], [, b]) => b - a);
+    if (timeEntries.length > 0) {
+        const bestHours = timeEntries.slice(0, 3).map(([h, w]) => `${h}:00 UTC (${w})`).join(', ');
+        sections.push(`\nBEST TIMES: ${bestHours}`);
+    }
 
-These content types have lower engagement — use less frequently:
-${bottomTypes.map(([type, weight]) => `- ${type.replace(/_/g, ' ')} (weight: ${weight})`).join('\n')}
+    // Tone insights
+    const toneEntries = Object.entries(weights.tone_weights).sort(([, a], [, b]) => b - a);
+    if (toneEntries.length > 0) {
+        const bestTones = toneEntries.slice(0, 3).map(([t, w]) => `${t} (${w})`).join(', ');
+        sections.push(`BEST TONES: ${bestTones}`);
+    }
 
-Last strategy update: ${weights.updated_at}`;
+    // Topic insights
+    const topicEntries = Object.entries(weights.topic_weights).sort(([, a], [, b]) => b - a);
+    if (topicEntries.length > 0) {
+        const bestTopics = topicEntries.slice(0, 3).map(([t, w]) => `${t} (${w})`).join(', ');
+        sections.push(`HOT TOPICS: ${bestTopics}`);
+    }
+
+    sections.push(`\nLast strategy update: ${weights.updated_at}`);
+
+    return sections.join('\n');
 }
