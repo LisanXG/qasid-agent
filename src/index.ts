@@ -90,7 +90,42 @@ async function main() {
         process.exit(0);
     }
 
-    // === Net Protocol CLI Commands ===
+    if (args[0] === 'x-check') {
+        // Diagnose X API capabilities
+        if (!isXConfigured) {
+            console.error('❌ X (Twitter) API not configured. Set X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in .env');
+            process.exit(1);
+        }
+
+        console.log('\n🔍 X API Capability Diagnostic');
+        console.log('─'.repeat(60));
+
+        const { checkXCapabilities } = await import('./platforms/x.js');
+        const results = await checkXCapabilities();
+
+        for (const r of results) {
+            const icon = r.status === 'pass' ? '✅' : r.status === 'fail' ? '❌' : '⏸️';
+            console.log(`  ${icon} ${r.name}`);
+            console.log(`     ${r.detail}`);
+        }
+
+        console.log('─'.repeat(60));
+
+        const passCount = results.filter(r => r.status === 'pass').length;
+        const failCount = results.filter(r => r.status === 'fail').length;
+
+        if (failCount === 0) {
+            console.log('🎉 Full access! All capabilities available.');
+        } else if (passCount >= 3) {
+            console.log(`⚠️  Partial access: ${passCount} passed, ${failCount} failed.`);
+            console.log('   Some features (like mentions/search) may require upgrading to Basic tier ($100/mo).');
+        } else {
+            console.log(`🔴 Limited access: ${passCount} passed, ${failCount} failed.`);
+            console.log('   Consider upgrading your X API tier for full QasidAI v2 capabilities.');
+        }
+        console.log();
+        process.exit(0);
+    }
 
     if (args[0] === 'net-upload') {
         // Upload QasidAI's full brain to Net Protocol

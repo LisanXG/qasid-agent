@@ -6,9 +6,13 @@ import { isXConfigured, isNetConfigured } from '../config.js';
 import { createLogger } from '../logger.js';
 import { buildAndWriteDailySummary } from '../net/daily-summary.js';
 import { scoreOldPosts } from '../learning/scorer.js';
+import { fetchAndUpdateEngagement } from '../learning/engagement.js';
 import { adaptWeights, getStrategyContext } from '../learning/weights.js';
 import { runMetaReview } from '../learning/meta-review.js';
 import { postToFeed } from '../net/client.js';
+import { runTimelineScan } from '../engine/timeline-scanner.js';
+import { runMentionMonitor } from '../engine/mention-monitor.js';
+import { runSmartFollow } from '../engine/smart-follow.js';
 
 // ============================================================================
 // QasidAI — Content Scheduler
@@ -201,10 +205,51 @@ export function startScheduler(): void {
 
     // ---- Learning Engine Crons ----
 
+    // Every 4 hours during waking hours — Timeline scanner (contextual replies)
+    const timelineScan = cron.schedule('0 7,11,15,19 * * *', async () => {
+        log.info('🔍 Timeline scan starting (contextual engagement)');
+        try {
+            const replies = await runTimelineScan();
+            log.info(`🔍 Timeline scan complete: ${replies} replies posted`);
+        } catch (error) {
+            log.error('Timeline scan failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(timelineScan);
+    log.info('🔍 Timeline scanner cron active (7, 11, 15, 19 UTC)');
+
+    // Every 2 hours — Mention monitor (respond to @mentions)
+    const mentionMonitor = cron.schedule('30 6,8,10,12,14,16,18,20,22 * * *', async () => {
+        log.info('📨 Mention monitor starting');
+        try {
+            const responses = await runMentionMonitor();
+            log.info(`📨 Mention monitor complete: ${responses} responses posted`);
+        } catch (error) {
+            log.error('Mention monitor failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(mentionMonitor);
+    log.info('📨 Mention monitor cron active (every 2h from 6:30-22:30 UTC)');
+
+    // Daily at 0:30 AM UTC — Fetch engagement metrics from X API
+    const engagementFetch = cron.schedule('30 0 * * *', async () => {
+        log.info('📊 Fetching engagement metrics from X API...');
+        try {
+            const updated = await fetchAndUpdateEngagement();
+            log.info(`📊 Engagement fetch complete: ${updated} posts updated`);
+        } catch (error) {
+            log.error('Engagement fetch failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(engagementFetch);
+    log.info('📊 Engagement fetch cron active (0:30 AM UTC)');
+
     // Daily at 1 AM UTC — Score old posts and adapt strategy weights
     const dailyLearning = cron.schedule('0 1 * * *', async () => {
-        log.info('🧠 Daily learning cycle: scoring posts + adapting weights');
+        log.info('🧠 Daily learning cycle: fetch metrics → score → adapt weights');
         try {
+            // Re-fetch metrics right before scoring for maximum freshness
+            await fetchAndUpdateEngagement();
             await scoreOldPosts();
             await adaptWeights();
         } catch (error) {
@@ -212,7 +257,7 @@ export function startScheduler(): void {
         }
     }, { timezone: 'UTC' });
     activeTasks.push(dailyLearning);
-    log.info('🧠 Daily learning cron active (1 AM UTC — score + adapt weights)');
+    log.info('🧠 Daily learning cron active (1 AM UTC — fetch + score + adapt weights)');
 
     // Weekly on Sundays at 2 AM UTC — Run meta-review
     const weeklyReview = cron.schedule('0 2 * * 0', async () => {
@@ -225,6 +270,19 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(weeklyReview);
     log.info('📊 Weekly meta-review cron active (Sun 2 AM UTC)');
+
+    // Daily at 3 AM UTC — Smart follow (follow engaged users)
+    const smartFollow = cron.schedule('0 3 * * *', async () => {
+        log.info('👥 Smart follow cycle starting');
+        try {
+            const followed = await runSmartFollow();
+            log.info(`👥 Smart follow complete: ${followed} users followed`);
+        } catch (error) {
+            log.error('Smart follow failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(smartFollow);
+    log.info('👥 Smart follow cron active (3 AM UTC)');
 
     // End-of-day — 11:55 PM UTC — Daily summary to Net Protocol (before the 23:30 reflection)
     if (isNetConfigured) {
