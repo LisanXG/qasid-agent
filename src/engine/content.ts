@@ -81,7 +81,9 @@ function buildGenerationPrompt(
 ): string {
     return `Generate a ${contentType.replace(/_/g, ' ')} post.
 
-For X/Twitter. Keep under 280 characters. No hashtags unless very natural. Punchy and direct. Write like a real person on crypto twitter — not like an AI reading a marketing brief.
+For X/Twitter. Keep under 280 characters. No hashtags. Punchy and direct. Write like a real person on crypto twitter — not like an AI.
+
+ANTI-SLOP REMINDER: Do NOT use any banned phrases from your instructions. No "dive in", "game changer", "unlock", "the future of", "buckle up", "here's the thing", "don't sleep on". Write like a HUMAN, not a marketing bot.
 
 Here is current live data from Lisan Intelligence to reference (use real numbers if relevant):
 
@@ -121,6 +123,28 @@ export async function generatePost(
 
     // Sanitize LLM output
     let content = sanitizeContent(result.content);
+
+    // Anti-slop retry: if banned phrase detected, regenerate (up to 2 retries)
+    let slopPhrase = detectSlop(content);
+    let retries = 0;
+    while (slopPhrase && retries < 2) {
+        retries++;
+        log.warn(`Slop detected: "${slopPhrase}" — regenerating (attempt ${retries + 1})`);
+        const retry = await generate({
+            prompt: prompt + `\n\nIMPORTANT: Your previous output contained the banned phrase "${slopPhrase}". Do NOT use it. Write something completely different and more natural.`,
+            strategyContext: options?.strategyContext,
+            timeContext,
+            maxTokens: 150,
+            temperature: Math.min(1.0, 0.9 + retries * 0.05), // Slightly higher temp each retry
+        });
+        content = sanitizeContent(retry.content);
+        result.inputTokens += retry.inputTokens;
+        result.outputTokens += retry.outputTokens;
+        slopPhrase = detectSlop(content);
+    }
+    if (slopPhrase) {
+        log.warn(`Slop persisted after ${retries} retries: "${slopPhrase}" — posting anyway`);
+    }
 
     // Enforce tweet length limit
     if (content.length > 280) {
@@ -186,6 +210,65 @@ export function inferTone(contentType: ContentType): string {
         cross_platform: 'casual',
     };
     return toneMap[contentType] || 'casual';
+}
+
+/**
+ * Banned phrases that AI loves to use. If detected in output,
+ * the content engine will regenerate rather than post slop.
+ */
+const BANNED_PHRASES = [
+    "let's dive",
+    "here's the thing",
+    "here's why",
+    "it's not just",
+    "in the world of",
+    "in today's",
+    "in the ever-evolving",
+    "when it comes to",
+    "at the end of the day",
+    "game changer",
+    "game-changing",
+    "level up",
+    "leveling up",
+    "revolutionize",
+    "revolutionizing",
+    "buckle up",
+    "strap in",
+    "not your average",
+    "not your typical",
+    "the future of",
+    "the future is",
+    "stay tuned",
+    "don't sleep on",
+    "think about it",
+    "let that sink in",
+    "the real alpha",
+    "what if i told you",
+    "imagine this",
+    "picture this",
+    "read that again",
+    "i said what i said",
+    "check it out!",
+    "don't miss this",
+    "you won't believe",
+    "excited to announce",
+    "thrilled to",
+    "this is huge",
+    "this is massive",
+];
+
+/**
+ * Check if content contains any banned slop phrases.
+ * Returns the first matched phrase, or null if clean.
+ */
+export function detectSlop(content: string): string | null {
+    const lower = content.toLowerCase();
+    for (const phrase of BANNED_PHRASES) {
+        if (lower.includes(phrase)) {
+            return phrase;
+        }
+    }
+    return null;
 }
 
 /**

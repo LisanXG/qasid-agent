@@ -44,7 +44,11 @@ function contentTypeToBotchanTopic(contentType: string): string {
  * Run a single content cycle: generate + post to X + save to memory.
  * @param options.crossPostToBotchan If true, also post to Botchan feed (once/day to save gas)
  */
-async function runContentCycle(options?: { strategyContext?: string; crossPostToBotchan?: boolean }): Promise<void> {
+async function runContentCycle(options?: {
+    strategyContext?: string;
+    crossPostToBotchan?: boolean;
+    preferredContentType?: string;
+}): Promise<void> {
     if (!isXConfigured) {
         log.warn('X not configured — skipping content cycle');
         return;
@@ -57,8 +61,11 @@ async function runContentCycle(options?: { strategyContext?: string; crossPostTo
     });
 
     try {
-        // Generate content
-        const post = await generatePost({ strategyContext: context });
+        // Generate content (use preferred type if specified by time slot)
+        const post = await generatePost({
+            strategyContext: context,
+            ...(options?.preferredContentType ? { contentType: options.preferredContentType as any } : {}),
+        });
 
         // Dedup check — skip if very similar content type posted recently
         const duplicate = await wasRecentlyPosted(post.contentType, 'x', 4);
@@ -136,70 +143,70 @@ export function startScheduler(): void {
     // 06:00 UTC — 🌅 GM post (+ Botchan cross-post)
     const gm = cron.schedule('0 6 * * *', async () => {
         log.info('🌅 GM cycle starting (+ Botchan cross-post)');
-        await runContentCycle({ crossPostToBotchan: true });
+        await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'gm_post' });
     }, { timezone: 'UTC' });
     activeTasks.push(gm);
 
     // 08:00 UTC — 📊 Market / signal data
     const marketData = cron.schedule('0 8 * * *', async () => {
         log.info('📊 Market data cycle starting');
-        await runContentCycle();
+        await runContentCycle({ preferredContentType: 'signal_scorecard' });
     }, { timezone: 'UTC' });
     activeTasks.push(marketData);
 
     // 10:00 UTC — 🧱 Builder narrative / founder journey (+ Botchan)
     const builder = cron.schedule('0 10 * * *', async () => {
         log.info('🧱 Builder narrative cycle starting (+ Botchan)');
-        await runContentCycle({ crossPostToBotchan: true });
+        await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'builder_narrative' });
     }, { timezone: 'UTC' });
     activeTasks.push(builder);
 
     // 12:00 UTC — 💡 Educational
     const educational = cron.schedule('0 12 * * *', async () => {
         log.info('💡 Educational cycle starting');
-        await runContentCycle();
+        await runContentCycle({ preferredContentType: 'educational' });
     }, { timezone: 'UTC' });
     activeTasks.push(educational);
 
     // 14:00 UTC — 🔥 Engagement / hot take (+ Botchan)
     const engagement = cron.schedule('0 14 * * *', async () => {
         log.info('🔥 Engagement cycle starting (+ Botchan)');
-        await runContentCycle({ crossPostToBotchan: true });
+        await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'engagement_bait' });
     }, { timezone: 'UTC' });
     activeTasks.push(engagement);
 
     // 16:00 UTC — 📦 Product spotlight
     const product = cron.schedule('0 16 * * *', async () => {
         log.info('📦 Product spotlight cycle starting');
-        await runContentCycle();
+        await runContentCycle({ preferredContentType: 'product_spotlight' });
     }, { timezone: 'UTC' });
     activeTasks.push(product);
 
     // 18:00 UTC — 🤖 Self-aware / meta AI (+ Botchan)
     const selfAware = cron.schedule('0 18 * * *', async () => {
         log.info('🤖 Self-aware cycle starting (+ Botchan)');
-        await runContentCycle({ crossPostToBotchan: true });
+        await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'self_aware' });
     }, { timezone: 'UTC' });
     activeTasks.push(selfAware);
 
     // 20:00 UTC — 📈 Signal performance / proof
     const performance = cron.schedule('0 20 * * *', async () => {
         log.info('📈 Performance cycle starting');
-        await runContentCycle();
+        await runContentCycle({ preferredContentType: 'win_streak' });
     }, { timezone: 'UTC' });
     activeTasks.push(performance);
 
     // 22:00 UTC — 🧠 Engagement bait / cult vibes (+ Botchan)
     const lateEngagement = cron.schedule('0 22 * * *', async () => {
         log.info('🧠 Late engagement cycle starting (+ Botchan)');
-        await runContentCycle({ crossPostToBotchan: true });
+        await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'founder_journey' });
     }, { timezone: 'UTC' });
     activeTasks.push(lateEngagement);
 
     // 23:30 UTC — 🌙 Evening reflection
     const evening = cron.schedule('30 23 * * *', async () => {
         log.info('🌙 Evening reflection cycle starting');
-        await runContentCycle();
+        await runContentCycle({ preferredContentType: 'social_proof' });
     }, { timezone: 'UTC' });
     activeTasks.push(evening);
 
