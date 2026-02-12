@@ -16,6 +16,7 @@ import { runSmartFollow } from '../engine/smart-follow.js';
 import { runCreativeSession } from '../engine/creative-session.js';
 import { recordAction } from '../engine/daily-budget.js';
 import { generateScorecardImage } from '../engine/scorecard-image.js';
+import { runBotchanContentCycle } from '../net/botchan-content.js';
 
 // ============================================================================
 // QasidAI — Content Scheduler
@@ -245,6 +246,34 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(creative);
     log.info('🎨 Creative sessions active (9:30, 13:30, 17:30, 21:30 UTC — QasidAI decides)');
+
+    // ---- Botchan Native Content (unique posts for Net Protocol) ----
+
+    // 11:00 UTC — Botchan market analysis or signal breakdown
+    const botchanMorning = cron.schedule('0 11 * * *', async () => {
+        log.info('🤖 Botchan native content: market/signal post');
+        try {
+            const type = Math.random() > 0.5 ? 'market_deep_dive' : 'signal_breakdown';
+            await runBotchanContentCycle(type as any);
+        } catch (error) {
+            log.error('Botchan morning post failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(botchanMorning);
+
+    // 19:00 UTC — Botchan builder log, capability share, or GitHub share
+    const botchanEvening = cron.schedule('0 19 * * *', async () => {
+        log.info('🤖 Botchan native content: builder/capability post');
+        try {
+            const types = ['builder_log', 'agent_capability', 'github_share', 'tool_spotlight'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            await runBotchanContentCycle(type as any);
+        } catch (error) {
+            log.error('Botchan evening post failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(botchanEvening);
+    log.info('🤖 Botchan native content active (11:00 + 19:00 UTC)');
 
     // Daily at 0:30 AM UTC — Fetch engagement metrics from X API
     const engagementFetch = cron.schedule('30 0 * * *', async () => {
