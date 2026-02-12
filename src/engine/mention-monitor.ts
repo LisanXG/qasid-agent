@@ -245,7 +245,7 @@ export async function runMentionMonitor(): Promise<number> {
         }
 
         // Check if this is a founder skill approval reply
-        if (mention.authorUsername?.toLowerCase() === 'lisantheresa' && mention.conversationId) {
+        if (mention.authorUsername?.toLowerCase() === 'lisantherealone' && mention.conversationId) {
             try {
                 const approval = await processSkillApproval(mention.text, mention.conversationId);
                 if (approval) {

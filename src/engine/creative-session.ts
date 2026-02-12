@@ -112,7 +112,7 @@ Reply with ONLY the tweet text (or "SKIP"):`,
         });
 
         const reply = result.content.trim().replace(/^["']|["']$/g, '');
-        if (reply.toUpperCase() === 'SKIP' || reply.length < 5) continue;
+        if (reply.toUpperCase().startsWith('SKIP') || reply.length < 5) continue;
 
         const replyId = await replyToTweet(tweet.id, reply);
         if (replyId) {
@@ -151,7 +151,7 @@ Reply with ONLY the tweet text (or "SKIP"):`,
         });
 
         const reply = result.content.trim().replace(/^["']|["']$/g, '');
-        if (reply.toUpperCase() === 'SKIP' || reply.length < 5) continue;
+        if (reply.toUpperCase().startsWith('SKIP') || reply.length < 5) continue;
 
         const replyId = await replyToTweet(mention.id, reply);
         if (replyId) {

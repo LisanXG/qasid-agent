@@ -13,7 +13,7 @@ import { recordAction } from '../engine/daily-budget.js';
 // Flow:
 // 1. QasidAI discovers a potential skill from timeline/Botchan
 // 2. Saves it as "pending_approval" in the DB
-// 3. Uses 1 discretionary action to tweet at @Lisantheresa asking permission
+// 3. Uses 1 discretionary action to tweet at @lisantherealone asking permission
 //    (includes link to where it found the skill)
 // 4. Founder replies "approved" or "denied" on the timeline
 // 5. Mention monitor processes the reply → activates or rejects the skill

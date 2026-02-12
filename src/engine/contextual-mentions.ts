@@ -25,7 +25,7 @@ export interface RelevantAccount {
 const RELEVANT_ACCOUNTS: RelevantAccount[] = [
     // Official / founder — highest priority
     {
-        handle: 'Lisantheresa',
+        handle: 'lisantherealone',
         category: 'founder',
         context: 'When talking about building, founder journey, company milestones, or the team behind Lisan',
         priority: 5,
