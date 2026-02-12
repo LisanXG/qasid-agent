@@ -17,6 +17,7 @@ import { runCreativeSession } from '../engine/creative-session.js';
 import { recordAction } from '../engine/daily-budget.js';
 import { generateScorecardImage } from '../engine/scorecard-image.js';
 import { runBotchanContentCycle } from '../net/botchan-content.js';
+import { initializeSkills, syncSkillsToChain } from '../skills/skill-manager.js';
 
 // ============================================================================
 // QasidAI — Content Scheduler
@@ -144,6 +145,11 @@ export function startScheduler(): void {
         log.warn('X not configured! Scheduler has nothing to do.');
         return;
     }
+
+    // Initialize skills system (fire-and-forget, non-blocking)
+    initializeSkills().catch(error => {
+        log.warn('Skills initialization failed, continuing without skills', { error: String(error) });
+    });
 
     // ---- 10 Content Cycles / Day ----
 
@@ -302,6 +308,20 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(dailyLearning);
     log.info('🧠 Daily learning cron active (1 AM UTC — fetch + score + adapt weights)');
+
+    // Daily at 1:30 AM UTC — Sync skills to Net Protocol
+    if (isNetConfigured) {
+        const skillSync = cron.schedule('30 1 * * *', async () => {
+            log.info('🧠 Syncing skills to Net Protocol...');
+            try {
+                await syncSkillsToChain();
+            } catch (error) {
+                log.error('Skill sync failed', { error: String(error) });
+            }
+        }, { timezone: 'UTC' });
+        activeTasks.push(skillSync);
+        log.info('🧠 Skill sync cron active (1:30 AM UTC)');
+    }
 
     // Weekly on Sundays at 2 AM UTC — Run meta-review
     const weeklyReview = cron.schedule('0 2 * * 0', async () => {

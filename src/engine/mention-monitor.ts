@@ -3,6 +3,7 @@ import { getMentions, replyToTweet, type MentionTweet } from '../platforms/x.js'
 import { gatherIntelContext } from '../data/intelligence.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
+import { processSkillApproval } from '../skills/skill-manager.js';
 
 // ============================================================================
 // QasidAI — Mention & Reply Monitor
@@ -241,6 +242,26 @@ export async function runMentionMonitor(): Promise<number> {
         if (await hasRespondedTo(mention.id)) {
             log.debug('Already responded to mention', { tweetId: mention.id });
             continue;
+        }
+
+        // Check if this is a founder skill approval reply
+        if (mention.authorUsername?.toLowerCase() === 'lisantheresa' && mention.conversationId) {
+            try {
+                const approval = await processSkillApproval(mention.text, mention.conversationId);
+                if (approval) {
+                    const ack = approval.approved
+                        ? `✅ Skill acquired: ${approval.skill.name}. Thanks boss, I'll put it to work.`
+                        : `Got it — skipping ${approval.skill.name}. Your call. 🫡`;
+                    const ackId = await replyToTweet(mention.id, ack);
+                    if (ackId) {
+                        await recordMentionResponse(mention.id, mention.authorUsername, ackId, ack);
+                        responded++;
+                    }
+                    continue;
+                }
+            } catch (error) {
+                log.debug('Not a skill approval reply', { error: String(error) });
+            }
         }
 
         // Draft a response

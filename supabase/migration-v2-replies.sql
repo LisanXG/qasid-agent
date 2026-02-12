@@ -87,3 +87,29 @@ ALTER TABLE qasid_daily_actions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Service role only" ON qasid_daily_actions FOR ALL
   USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+
+-- ============================================================================
+-- Skills: QasidAI's learned capabilities and patterns
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS qasid_skills (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  category TEXT NOT NULL,        -- 'content', 'analysis', 'engagement', 'technical', 'knowledge', 'meta'
+  source TEXT NOT NULL,          -- 'built_in', 'timeline', 'botchan', 'experience', 'self_taught'
+  source_url TEXT,               -- URL where QasidAI found the skill
+  prompt TEXT NOT NULL,
+  examples TEXT,                 -- JSON array
+  learned_at TIMESTAMPTZ DEFAULT NOW(),
+  usage_count INTEGER DEFAULT 0,
+  last_used TIMESTAMPTZ,
+  confidence DECIMAL(3,2) DEFAULT 0.50,
+  status TEXT DEFAULT 'active',  -- 'active', 'pending_approval', 'denied'
+  approval_tweet_id TEXT         -- Tweet ID where QasidAI asked founder for approval
+);
+
+ALTER TABLE qasid_skills ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role only" ON qasid_skills FOR ALL
+  USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
