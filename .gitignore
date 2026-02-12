@@ -9,6 +9,9 @@ dist/
 .env.local
 .env.*.local
 
+# Nested repos (tracked separately)
+LISAN_HOLDINGS_HUB/
+
 # OS files
 .DS_Store
 Thumbs.db

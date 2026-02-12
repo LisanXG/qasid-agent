@@ -26,4 +26,8 @@ console.log(`
   3. Fund the wallet address with ~$0.50 of ETH on Base
      → Send Base ETH to: ${account.address}
      → You can bridge ETH to Base at https://bridge.base.org
+
+  🔐 SECURITY: This key was printed to your terminal.
+     Clear your terminal history after copying it to .env.
+     Never share this key or commit it to git.
 `);

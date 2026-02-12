@@ -12,7 +12,7 @@ const envSchema = z.object({
     // Supabase
     SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
     SUPABASE_ANON_KEY: z.string().min(1, 'SUPABASE_ANON_KEY is required'),
-    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required — anon key will be blocked by RLS'),
 
     // X / Twitter
     X_API_KEY: z.string().optional(),

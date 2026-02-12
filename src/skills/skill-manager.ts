@@ -218,9 +218,20 @@ export async function recordSkillUsage(skillId: string): Promise<void> {
     skill.usageCount += 1;
     skill.lastUsed = new Date().toISOString();
 
+    // Confidence decay: if not used in 30+ days, reduce confidence slightly
+    // This prevents stale skills from being over-prioritized
+    if (skill.source !== 'built_in') {
+        const daysSinceLastUse = skill.lastUsed
+            ? (Date.now() - new Date(skill.lastUsed).getTime()) / (1000 * 60 * 60 * 24)
+            : 0;
+        if (daysSinceLastUse > 30) {
+            skill.confidence = Math.max(0.3, skill.confidence - 0.05);
+        }
+    }
+
     await supabase
         .from('qasid_skills')
-        .update({ usage_count: skill.usageCount, last_used: skill.lastUsed })
+        .update({ usage_count: skill.usageCount, last_used: skill.lastUsed, confidence: skill.confidence })
         .eq('id', skillId)
         .then(({ error }) => {
             if (error) log.warn('Failed to update skill usage', { error: error.message });

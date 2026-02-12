@@ -123,49 +123,11 @@ async function followMentioners(budget: number): Promise<number> {
     return followed;
 }
 
-/**
- * Source 2: Follow users who replied to QasidAI's tweets.
- * Check the qasid_replies table for recent reply targets — the people
- * QasidAI already replied to are engaged and worth following.
- */
-async function followEngagedUsers(budget: number): Promise<number> {
-    if (budget <= 0) return 0;
-
-    // Get recent reply records where source was timeline scanner or mention
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: replyRecords, error } = await supabase
-        .from('qasid_replies')
-        .select('target_author')
-        .gte('replied_at', since)
-        .order('replied_at', { ascending: false })
-        .limit(30);
-
-    if (error || !replyRecords?.length) return 0;
-
-    // Get unique authors we interacted with
-    const authors = [...new Set(replyRecords.map(r => r.target_author).filter(Boolean))];
-
-    let followed = 0;
-    for (const username of authors) {
-        if (followed >= budget) break;
-
-        // We have username, not ID — need to look up
-        // For now, skip since we don't have a user lookup function
-        // This will be enhanced when we add user lookup by username
-        // The mentioner flow (Source 1) already handles most cases
-    }
-
-    return followed;
-}
-
 // ---- Main Engine ----
 
 /**
  * Run a smart follow cycle.
- * Priority order:
- * 1. Follow mentioners (warmest leads)
- * 2. Follow engaged users from reply history
- *
+ * Follows users who mentioned @QasidAI (warmest leads).
  * Returns the number of users followed.
  */
 export async function runSmartFollow(): Promise<number> {
@@ -183,20 +145,10 @@ export async function runSmartFollow(): Promise<number> {
         MAX_FOLLOWS_PER_DAY - recentCount,
     );
 
-    let totalFollowed = 0;
-
-    // Source 1: Mentioners (highest priority — they tagged us)
-    const mentionerFollows = await followMentioners(totalBudget);
-    totalFollowed += mentionerFollows;
-
-    // Source 2: Engaged users (people we've replied to via scanner)
-    const remainingBudget = totalBudget - totalFollowed;
-    const engagedFollows = await followEngagedUsers(remainingBudget);
-    totalFollowed += engagedFollows;
+    // Follow mentioners (people who tagged us are warm leads)
+    const totalFollowed = await followMentioners(totalBudget);
 
     log.info(`Smart follow complete: ${totalFollowed} users followed`, {
-        mentioners: mentionerFollows,
-        engaged: engagedFollows,
         dailyTotal: recentCount + totalFollowed,
     });
 

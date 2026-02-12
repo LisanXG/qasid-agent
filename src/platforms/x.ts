@@ -370,6 +370,19 @@ export async function followUser(userId: string): Promise<boolean> {
         log.info('Followed user', { userId });
         return true;
     } catch (error: any) {
+        if (error?.code === 429 || error?.data?.status === 429) {
+            log.warn('Rate limited on follow, retrying in 60s...');
+            await new Promise(resolve => setTimeout(resolve, 60_000));
+            try {
+                const myId = await getMyUserId();
+                await getClient().v2.follow(myId, userId);
+                log.info('Followed user (after rate limit retry)', { userId });
+                return true;
+            } catch (retryError) {
+                log.error('Failed to follow after rate limit retry', { error: String(retryError), userId });
+                return false;
+            }
+        }
         log.error('Failed to follow user', { error: String(error), userId });
         return false;
     }

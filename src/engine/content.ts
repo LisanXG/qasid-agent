@@ -84,7 +84,8 @@ function buildGenerationPrompt(
 ): string {
     const brandInfo = `BRAND: QasidAI is the autonomous CMO of Lisan Holdings. Products: LISAN Intelligence (AI trading signals), QasidAI (this agent), SigmaPips (Telegram signals), Net Protocol (on-chain storage).`;
     const typeGuidance = `CONTENT TYPE: ${contentType.replace(/_/g, ' ')} — write ONE tweet (max 270 chars).`;
-    const antiSlop = `RULES: No hashtags. No emojis at start. No 'just', 'exciting', 'incredible'. No corporate speak. Sound like a sharp crypto native, not a press release.`;
+    const antiSlop = `RULES: No hashtags. No emojis at start. No corporate speak. Sound like a sharp crypto native, not a press release.
+BANNED PHRASES (never use these): "let's dive", "here's the thing", "game changer", "buckle up", "don't sleep on", "the future of", "excited to announce", "thrilled to", "this is huge", "revolutionize", "level up", "stay tuned", "not your average", "what if i told you", "picture this", "read that again", "you won't believe", "in the ever-evolving", "at the end of the day". Write like a HUMAN, not a marketing bot.`;
     const exclusionBlock = exclusions ? `\n\nAVOID REPEATING — here are recent posts (write something DIFFERENT):\n${exclusions}` : '';
 
     return `${brandInfo}\n\n${typeGuidance}\n\n${antiSlop}\n\nLIVE DATA:\n${intelContext.slice(0, 600)}${exclusionBlock}\n\nWrite the tweet now. Output ONLY the tweet text, nothing else.`;
@@ -246,6 +247,8 @@ RULES:
 
 MARKET DATA:
 ${combinedContext.slice(0, 600)}
+
+TIME CONTEXT: ${timeContext}
 
 Generate ONLY the thread tweets separated by "---". No preamble, no labels like "Tweet 1:", just the raw text:`,
         strategyContext: options?.strategyContext,
