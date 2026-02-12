@@ -1,6 +1,7 @@
 import { generate } from './llm.js';
 import { generatePost, generateThread } from './content.js';
-import { searchRecentTweets, replyToTweet, getMentions, postThread, type SearchResult, type MentionTweet } from '../platforms/x.js';
+import { searchRecentTweets, replyToTweet, getMentions, postThread, postTweetWithImage, type SearchResult, type MentionTweet } from '../platforms/x.js';
+import { generateScorecardImage } from './scorecard-image.js';
 import { gatherIntelContext } from '../data/intelligence.js';
 import { getDiscretionaryRemaining, recordAction, getBudgetSummary } from './daily-budget.js';
 import { supabase } from '../supabase.js';
@@ -20,6 +21,7 @@ const AVAILABLE_ACTIONS = [
     'REPLY_MENTION — Respond to someone who @mentioned us',
     'BONUS_POST — Post extra original content (a thought, hot take, or observation)',
     'THREAD — Post a multi-tweet thread (3-5 tweets) diving deep into a topic',
+    'IMAGE_POST — Post a signal scorecard image with live data',
     'QUOTE_COMMENT — Find a tweet worth quote-commenting on',
     'SKIP — Save the remaining budget (no more actions this session)',
 ];
@@ -213,6 +215,25 @@ async function executeThread(): Promise<boolean> {
     return false;
 }
 
+/**
+ * Execute an IMAGE_POST action.
+ */
+async function executeImagePost(): Promise<boolean> {
+    const scorecard = await generateScorecardImage();
+    if (!scorecard) {
+        log.warn('Scorecard image generation failed');
+        return false;
+    }
+
+    const externalId = await postTweetWithImage(scorecard.caption, scorecard.buffer);
+    if (externalId) {
+        await recordAction('bonus_post', `Scorecard image: ${scorecard.caption.slice(0, 60)}`, externalId);
+        log.info('✅ Scorecard image posted', { tweetId: externalId });
+        return true;
+    }
+    return false;
+}
+
 // ---- Main Creative Session ----
 
 /**
@@ -283,6 +304,7 @@ Just the action names, one per line. No explanation needed:`,
         else if (cleaned.startsWith('REPLY_MENTION')) actions.push('REPLY_MENTION');
         else if (cleaned.startsWith('BONUS_POST') || cleaned.startsWith('BONUS')) actions.push('BONUS_POST');
         else if (cleaned.startsWith('THREAD')) actions.push('THREAD');
+        else if (cleaned.startsWith('IMAGE')) actions.push('IMAGE_POST');
         else if (cleaned.startsWith('QUOTE')) actions.push('QUOTE_COMMENT');
         else if (cleaned.startsWith('SKIP')) break; // Stop planning
     }
@@ -316,6 +338,9 @@ Just the action names, one per line. No explanation needed:`,
                     break;
                 case 'THREAD':
                     success = await executeThread();
+                    break;
+                case 'IMAGE_POST':
+                    success = await executeImagePost();
                     break;
                 case 'QUOTE_COMMENT':
                     // Quote tweet is like reply trending but with a different format

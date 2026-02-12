@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { generatePost } from '../engine/content.js';
 import { savePost, wasRecentlyPosted } from '../engine/memory.js';
-import { postTweet } from '../platforms/x.js';
+import { postTweet, postTweetWithImage } from '../platforms/x.js';
 import { isXConfigured, isNetConfigured } from '../config.js';
 import { createLogger } from '../logger.js';
 import { buildAndWriteDailySummary } from '../net/daily-summary.js';
@@ -15,6 +15,7 @@ import { runMentionMonitor } from '../engine/mention-monitor.js';
 import { runSmartFollow } from '../engine/smart-follow.js';
 import { runCreativeSession } from '../engine/creative-session.js';
 import { recordAction } from '../engine/daily-budget.js';
+import { generateScorecardImage } from '../engine/scorecard-image.js';
 
 // ============================================================================
 // QasidAI — Content Scheduler
@@ -152,9 +153,24 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(gm);
 
-    // 08:00 UTC — 📊 Market / signal data
+    // 08:00 UTC — 📊 Market / signal data (WITH scorecard image)
     const marketData = cron.schedule('0 8 * * *', async () => {
-        log.info('📊 Market data cycle starting');
+        log.info('📊 Market data cycle starting (with scorecard image)');
+        try {
+            // Try to generate and post a scorecard image
+            const scorecard = await generateScorecardImage();
+            if (scorecard) {
+                const externalId = await postTweetWithImage(scorecard.caption, scorecard.buffer);
+                if (externalId) {
+                    log.info('📊 Scorecard image posted', { tweetId: externalId });
+                    await recordAction('scheduled_post', `signal_scorecard (image): ${scorecard.caption.slice(0, 60)}`, externalId);
+                    return;
+                }
+            }
+        } catch (error) {
+            log.warn('Scorecard image failed, falling back to text', { error: String(error) });
+        }
+        // Fallback to text-only
         await runContentCycle({ preferredContentType: 'signal_scorecard' });
     }, { timezone: 'UTC' });
     activeTasks.push(marketData);
