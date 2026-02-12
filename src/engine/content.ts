@@ -3,6 +3,7 @@ import { gatherIntelContext } from '../data/intelligence.js';
 import { gatherMarketContext } from '../data/market.js';
 import { createLogger } from '../logger.js';
 import { contentTypes, type ContentType } from '../personality/system-prompt.js';
+import { addContextualMentions } from './contextual-mentions.js';
 
 // ============================================================================
 // QasidAI — Content Generation Engine
@@ -145,6 +146,9 @@ export async function generatePost(
     if (slopPhrase) {
         log.warn(`Slop persisted after ${retries} retries: "${slopPhrase}" — posting anyway`);
     }
+
+    // Add contextual @-mentions if relevant
+    content = await addContextualMentions(content);
 
     // Enforce tweet length limit
     if (content.length > 280) {
