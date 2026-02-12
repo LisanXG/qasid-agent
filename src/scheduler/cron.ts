@@ -143,10 +143,10 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(marketData);
 
-    // 10:00 UTC — 🧱 Builder narrative / founder journey
+    // 10:00 UTC — 🧱 Builder narrative / founder journey (+ Botchan)
     const builder = cron.schedule('0 10 * * *', async () => {
-        log.info('🧱 Builder narrative cycle starting');
-        await runContentCycle();
+        log.info('🧱 Builder narrative cycle starting (+ Botchan)');
+        await runContentCycle({ crossPostToBotchan: true });
     }, { timezone: 'UTC' });
     activeTasks.push(builder);
 
@@ -157,10 +157,10 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(educational);
 
-    // 14:00 UTC — 🔥 Engagement / hot take
+    // 14:00 UTC — 🔥 Engagement / hot take (+ Botchan)
     const engagement = cron.schedule('0 14 * * *', async () => {
-        log.info('🔥 Engagement cycle starting');
-        await runContentCycle();
+        log.info('🔥 Engagement cycle starting (+ Botchan)');
+        await runContentCycle({ crossPostToBotchan: true });
     }, { timezone: 'UTC' });
     activeTasks.push(engagement);
 
@@ -171,10 +171,10 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(product);
 
-    // 18:00 UTC — 🤖 Self-aware / meta AI
+    // 18:00 UTC — 🤖 Self-aware / meta AI (+ Botchan)
     const selfAware = cron.schedule('0 18 * * *', async () => {
-        log.info('🤖 Self-aware cycle starting');
-        await runContentCycle();
+        log.info('🤖 Self-aware cycle starting (+ Botchan)');
+        await runContentCycle({ crossPostToBotchan: true });
     }, { timezone: 'UTC' });
     activeTasks.push(selfAware);
 
@@ -185,10 +185,10 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(performance);
 
-    // 22:00 UTC — 🧠 Engagement bait / cult vibes
+    // 22:00 UTC — 🧠 Engagement bait / cult vibes (+ Botchan)
     const lateEngagement = cron.schedule('0 22 * * *', async () => {
-        log.info('🧠 Late engagement cycle starting');
-        await runContentCycle();
+        log.info('🧠 Late engagement cycle starting (+ Botchan)');
+        await runContentCycle({ crossPostToBotchan: true });
     }, { timezone: 'UTC' });
     activeTasks.push(lateEngagement);
 
