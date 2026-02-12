@@ -66,3 +66,24 @@ ALTER TABLE qasid_follows ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Service role only" ON qasid_follows FOR ALL
   USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+
+-- ============================================================================
+-- Daily action budget: tracks all actions QasidAI takes per day (20 total)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS qasid_daily_actions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  day TEXT NOT NULL,            -- YYYY-MM-DD (UTC)
+  action_type TEXT NOT NULL,    -- 'scheduled_post', 'reply', 'mention_response', 'bonus_post', etc.
+  description TEXT,
+  tweet_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_qasid_daily_actions_day ON qasid_daily_actions(day);
+CREATE INDEX IF NOT EXISTS idx_qasid_daily_actions_day_type ON qasid_daily_actions(day, action_type);
+
+ALTER TABLE qasid_daily_actions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role only" ON qasid_daily_actions FOR ALL
+  USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');

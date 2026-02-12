@@ -13,6 +13,8 @@ import { postToFeed } from '../net/client.js';
 import { runTimelineScan } from '../engine/timeline-scanner.js';
 import { runMentionMonitor } from '../engine/mention-monitor.js';
 import { runSmartFollow } from '../engine/smart-follow.js';
+import { runCreativeSession } from '../engine/creative-session.js';
+import { recordAction } from '../engine/daily-budget.js';
 
 // ============================================================================
 // QasidAI — Content Scheduler
@@ -106,6 +108,9 @@ async function runContentCycle(options?: {
         log.info(`✅ Content cycle complete: ${post.contentType} → X${options?.crossPostToBotchan ? ' + Botchan' : ''}`, {
             contentLength: post.content.length,
         });
+
+        // Record against daily budget
+        await recordAction('scheduled_post', `${post.contentType}: ${post.content.slice(0, 60)}`, externalId ?? undefined);
     } catch (error) {
         log.error('Content cycle failed', { error: String(error) });
     }
@@ -210,33 +215,20 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(evening);
 
-    // ---- Learning Engine Crons ----
+    // ---- Creative Sessions (LLM-driven discretionary budget) ----
 
-    // Every 4 hours during waking hours — Timeline scanner (contextual replies)
-    const timelineScan = cron.schedule('0 7,11,15,19 * * *', async () => {
-        log.info('🔍 Timeline scan starting (contextual engagement)');
+    // 4 creative sessions per day — QasidAI decides what to do
+    const creative = cron.schedule('30 9,13,17,21 * * *', async () => {
+        log.info('🎨 Creative session starting (QasidAI decides what to do)');
         try {
-            const replies = await runTimelineScan();
-            log.info(`🔍 Timeline scan complete: ${replies} replies posted`);
+            const actions = await runCreativeSession();
+            log.info(`🎨 Creative session complete: ${actions} actions taken`);
         } catch (error) {
-            log.error('Timeline scan failed', { error: String(error) });
+            log.error('Creative session failed', { error: String(error) });
         }
     }, { timezone: 'UTC' });
-    activeTasks.push(timelineScan);
-    log.info('🔍 Timeline scanner cron active (7, 11, 15, 19 UTC)');
-
-    // Every 2 hours — Mention monitor (respond to @mentions)
-    const mentionMonitor = cron.schedule('30 6,8,10,12,14,16,18,20,22 * * *', async () => {
-        log.info('📨 Mention monitor starting');
-        try {
-            const responses = await runMentionMonitor();
-            log.info(`📨 Mention monitor complete: ${responses} responses posted`);
-        } catch (error) {
-            log.error('Mention monitor failed', { error: String(error) });
-        }
-    }, { timezone: 'UTC' });
-    activeTasks.push(mentionMonitor);
-    log.info('📨 Mention monitor cron active (every 2h from 6:30-22:30 UTC)');
+    activeTasks.push(creative);
+    log.info('🎨 Creative sessions active (9:30, 13:30, 17:30, 21:30 UTC — QasidAI decides)');
 
     // Daily at 0:30 AM UTC — Fetch engagement metrics from X API
     const engagementFetch = cron.schedule('30 0 * * *', async () => {
