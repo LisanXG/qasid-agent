@@ -124,7 +124,7 @@ export async function generatePost(
 }
 
 /** Infer the main topic from post content */
-function inferTopic(content: string): string {
+export function inferTopic(content: string): string {
     const lower = content.toLowerCase();
     const topics = [
         { keyword: 'btc', topic: 'BTC' }, { keyword: 'bitcoin', topic: 'BTC' },
@@ -144,7 +144,7 @@ function inferTopic(content: string): string {
 }
 
 /** Map content type to a rough tone */
-function inferTone(contentType: ContentType): string {
+export function inferTone(contentType: ContentType): string {
     const toneMap: Record<ContentType, string> = {
         signal_scorecard: 'data-heavy',
         win_streak: 'aggressive',
@@ -163,7 +163,7 @@ function inferTone(contentType: ContentType): string {
 /**
  * Sanitize LLM output — strip preamble, quotes, and other artifacts.
  */
-function sanitizeContent(raw: string): string {
+export function sanitizeContent(raw: string): string {
     let text = raw.trim();
 
     // Remove surrounding quotes (LLM sometimes wraps in quotes)
@@ -171,15 +171,20 @@ function sanitizeContent(raw: string): string {
         text = text.slice(1, -1).trim();
     }
 
-    // Remove common LLM preamble patterns
+    // Remove common LLM preamble patterns — run ALL patterns exhaustively
+    // Order matters: combined patterns first, then individual components
     const preambles = [
+        /^Sure[!,.]?\s*Here(?:'s| is)\s+(?:a |the |my |your )?(?:post|tweet|content)[:\s]*\n*/i,
+        /^Sure[!,.]?\s*(?:Here(?:'s| is))?\s*/i,
         /^Here(?:'s| is) (?:a |the |my |your )?(?:post|tweet|content)[:\s]*\n*/i,
         /^(?:Post|Tweet):\s*\n*/i,
-        /^Sure[!,.]?\s*(?:Here(?:'s| is))?\s*/i,
     ];
     for (const pattern of preambles) {
         text = text.replace(pattern, '');
     }
+
+    // Second pass — catch residual preamble fragments after quote/preamble removal
+    text = text.replace(/^[:\s\-–—]+/, '').trim();
 
     // Safety: refuse to post anything that looks like a system prompt leak
     const dangerPatterns = [

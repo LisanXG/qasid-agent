@@ -36,6 +36,76 @@ QasidAI operates as a fully autonomous marketing agent:
 3. **Learning Loop** — After 24 hours, scores each post's engagement (reactions, replies, clicks), adjusts content type weights, and runs weekly meta-reviews
 4. **On-Chain Memory** — Stores its personality, brand knowledge, strategy snapshots, and daily summaries on Base L2 via Net Protocol for permanent verifiability
 
+## Setup
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env
+# Edit .env with your API keys:
+#   ANTHROPIC_API_KEY     — Claude API key
+#   SUPABASE_URL          — Supabase project URL
+#   SUPABASE_ANON_KEY     — Supabase anon key
+#   SUPABASE_SERVICE_ROLE_KEY — Supabase service role key (server-side access)
+#   X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET — X API credentials
+#   NET_PRIVATE_KEY       — (optional) wallet private key for on-chain brain
+#   NET_ENABLED           — set to "true" to enable Net Protocol
+#   POSTING_ENABLED       — set to "true" to post live (default: dry run)
+```
+
+### 3. Run Supabase Migration
+
+Run `supabase/migration.sql` in your Supabase SQL editor to create the required tables.
+
+If updating an existing deployment, also run `supabase/migration-update.sql`.
+
+### 4. CLI Commands
+
+```bash
+# Development mode (hot reload)
+npm run dev
+
+# Test content generation (no posting)
+npm run dev -- test
+
+# Post once to X
+npm run dev -- once
+
+# Post once to X + Botchan
+npm run dev -- once-botchan
+
+# Post to Botchan feed
+npm run dev -- botchan-post <topic> <message>
+
+# Upload brain to Net Protocol
+npm run dev -- net-upload
+
+# Upload agent profile to Net Protocol
+npm run dev -- net-profile
+
+# Write daily summary to Net Protocol
+npm run dev -- net-summary
+
+# Check Net Protocol status
+npm run dev -- net-status
+
+# Read brain data from Net Protocol
+npm run dev -- net-read
+
+# Run tests
+npm test
+
+# Production build
+npm run build
+npm start
+```
+
 ## Links
 
 - 🐦 **QasidAI on X**: [@QasidAI_](https://x.com/QasidAI_)

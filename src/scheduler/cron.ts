@@ -47,7 +47,10 @@ async function runContentCycle(options?: { strategyContext?: string; crossPostTo
     }
 
     // Load current strategy context from learned weights
-    const context = options?.strategyContext ?? await getStrategyContext().catch(() => undefined);
+    const context = options?.strategyContext ?? await getStrategyContext().catch((err) => {
+        log.warn('Failed to load strategy context, continuing without it', { error: String(err).slice(0, 200) });
+        return undefined;
+    });
 
     try {
         // Generate content

@@ -109,6 +109,7 @@ export async function runMetaReview(): Promise<WeeklyReport | null> {
             avg_performance_score: report.avgPerformanceScore,
             best_content_type: report.bestContentType,
             worst_content_type: report.worstContentType,
+            trend: report.trend,
             report: report,
         });
 

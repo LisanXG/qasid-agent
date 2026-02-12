@@ -12,6 +12,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { config, isNetConfigured } from '../config.js';
 import { createLogger } from '../logger.js';
+import { withRetry } from '../retry.js';
 
 // ============================================================================
 // QasidAI — Net Protocol Client
@@ -165,42 +166,22 @@ export async function writeStorage(key: string, text: string, data: string): Pro
 
     log.info(`Writing to Net Storage: key="${key}"`, { textPreview: text.slice(0, 50) });
 
-    const MAX_RETRIES = 3;
+    return withRetry(async () => {
+        const txHash = await walletClient!.writeContract({
+            address: STORAGE_CONTRACT,
+            abi: STORAGE_ABI,
+            functionName: 'put',
+            args: [keyHash, text, dataBytes],
+            chain: base,
+        });
 
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const txHash = await walletClient!.writeContract({
-                address: STORAGE_CONTRACT,
-                abi: STORAGE_ABI,
-                functionName: 'put',
-                args: [keyHash, text, dataBytes],
-                chain: base,
-            });
-
-            log.info(`✅ Net Storage write confirmed`, { txHash, key });
-            return txHash;
-        } catch (error: any) {
-            // Don't retry on insufficient funds — user needs to add ETH
-            const msg = String(error).toLowerCase();
-            if (msg.includes('insufficient funds') || msg.includes('exceeds balance')) {
-                log.error('Wallet has insufficient ETH for gas — fund the wallet', { key });
-                throw error;
-            }
-
-            if (attempt < MAX_RETRIES) {
-                const delay = Math.pow(2, attempt) * 2000; // 4s, 8s
-                log.warn(`Net Storage write attempt ${attempt}/${MAX_RETRIES} failed, retrying in ${delay}ms...`, {
-                    error: String(error).slice(0, 200),
-                });
-                await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-                log.error('Net Storage write failed after all retries', { key, error: String(error).slice(0, 200) });
-                throw error;
-            }
-        }
-    }
-
-    throw new Error(`Net Storage write failed for key="${key}"`);
+        log.info(`✅ Net Storage write confirmed`, { txHash, key });
+        return txHash;
+    }, {
+        maxRetries: 3,
+        baseDelayMs: 2000,
+        label: `Net Storage write (${key})`,
+    });
 }
 
 /**
@@ -312,39 +293,20 @@ export async function postToFeed(text: string, topic: string, data?: string): Pr
 
     log.info(`Posting to Botchan feed: topic="${normalizedTopic}"`, { textPreview: text.slice(0, 80) });
 
-    const MAX_RETRIES = 3;
+    return withRetry(async () => {
+        const txHash = await walletClient!.writeContract({
+            address: NET_CORE_CONTRACT,
+            abi: NET_CORE_ABI,
+            functionName: 'sendMessage',
+            args: [text, normalizedTopic, dataBytes],
+            chain: base,
+        });
 
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const txHash = await walletClient!.writeContract({
-                address: NET_CORE_CONTRACT,
-                abi: NET_CORE_ABI,
-                functionName: 'sendMessage',
-                args: [text, normalizedTopic, dataBytes],
-                chain: base,
-            });
-
-            log.info(`✅ Botchan post confirmed`, { txHash, topic: normalizedTopic });
-            return txHash;
-        } catch (error: any) {
-            const msg = String(error).toLowerCase();
-            if (msg.includes('insufficient funds') || msg.includes('exceeds balance')) {
-                log.error('Wallet has insufficient ETH for Botchan gas', { topic });
-                throw error;
-            }
-
-            if (attempt < MAX_RETRIES) {
-                const delay = Math.pow(2, attempt) * 2000;
-                log.warn(`Botchan post attempt ${attempt}/${MAX_RETRIES} failed, retrying in ${delay}ms...`, {
-                    error: String(error).slice(0, 200),
-                });
-                await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-                log.error('Botchan post failed after all retries', { topic, error: String(error).slice(0, 200) });
-                throw error;
-            }
-        }
-    }
-
-    throw new Error(`Botchan post failed for topic="${topic}"`);
+        log.info(`✅ Botchan post confirmed`, { txHash, topic: normalizedTopic });
+        return txHash;
+    }, {
+        maxRetries: 3,
+        baseDelayMs: 2000,
+        label: `Botchan post (${topic})`,
+    });
 }
