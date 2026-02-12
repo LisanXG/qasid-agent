@@ -1,6 +1,6 @@
 import { generate } from './llm.js';
-import { generatePost } from './content.js';
-import { searchRecentTweets, replyToTweet, getMentions, type SearchResult, type MentionTweet } from '../platforms/x.js';
+import { generatePost, generateThread } from './content.js';
+import { searchRecentTweets, replyToTweet, getMentions, postThread, type SearchResult, type MentionTweet } from '../platforms/x.js';
 import { gatherIntelContext } from '../data/intelligence.js';
 import { getDiscretionaryRemaining, recordAction, getBudgetSummary } from './daily-budget.js';
 import { supabase } from '../supabase.js';
@@ -19,6 +19,7 @@ const AVAILABLE_ACTIONS = [
     'REPLY_TRENDING — Find and reply to a trending/relevant tweet in the crypto/AI space',
     'REPLY_MENTION — Respond to someone who @mentioned us',
     'BONUS_POST — Post extra original content (a thought, hot take, or observation)',
+    'THREAD — Post a multi-tweet thread (3-5 tweets) diving deep into a topic',
     'QUOTE_COMMENT — Find a tweet worth quote-commenting on',
     'SKIP — Save the remaining budget (no more actions this session)',
 ];
@@ -181,6 +182,37 @@ async function executeBonusPost(): Promise<boolean> {
     return false;
 }
 
+/**
+ * Execute a THREAD action.
+ */
+async function executeThread(): Promise<boolean> {
+    const thread = await generateThread();
+    if (thread.tweets.length < 2) {
+        log.warn('Thread too short, skipping');
+        return false;
+    }
+
+    const ids = await postThread(thread.tweets);
+    if (ids.length > 0) {
+        const { savePost } = await import('../engine/memory.js');
+        // Save the first tweet as the "post" in memory
+        await savePost({
+            content: thread.tweets.join(' | '),
+            contentType: thread.contentType,
+            platform: 'x',
+            tone: 'insightful',
+            topic: thread.topic,
+            inputTokens: thread.inputTokens,
+            outputTokens: thread.outputTokens,
+            generatedAt: new Date().toISOString(),
+        }, ids[0]);
+        await recordAction('thread', `${thread.contentType} thread (${ids.length} tweets): ${thread.tweets[0].slice(0, 50)}`, ids[0]);
+        log.info('✅ Thread published', { tweets: ids.length, contentType: thread.contentType });
+        return true;
+    }
+    return false;
+}
+
 // ---- Main Creative Session ----
 
 /**
@@ -249,7 +281,8 @@ Just the action names, one per line. No explanation needed:`,
         const cleaned = line.replace(/^\d+[\.\)]\s*/, '').trim().toUpperCase();
         if (cleaned.startsWith('REPLY_TRENDING')) actions.push('REPLY_TRENDING');
         else if (cleaned.startsWith('REPLY_MENTION')) actions.push('REPLY_MENTION');
-        else if (cleaned.startsWith('BONUS_POST')) actions.push('BONUS_POST');
+        else if (cleaned.startsWith('BONUS_POST') || cleaned.startsWith('BONUS')) actions.push('BONUS_POST');
+        else if (cleaned.startsWith('THREAD')) actions.push('THREAD');
         else if (cleaned.startsWith('QUOTE')) actions.push('QUOTE_COMMENT');
         else if (cleaned.startsWith('SKIP')) break; // Stop planning
     }
@@ -280,6 +313,9 @@ Just the action names, one per line. No explanation needed:`,
                     break;
                 case 'BONUS_POST':
                     success = await executeBonusPost();
+                    break;
+                case 'THREAD':
+                    success = await executeThread();
                     break;
                 case 'QUOTE_COMMENT':
                     // Quote tweet is like reply trending but with a different format

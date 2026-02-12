@@ -168,6 +168,94 @@ export async function generatePost(
     };
 }
 
+/** Thread-friendly content types — topics that deserve depth */
+const THREAD_TYPES: ContentType[] = [
+    'signal_scorecard', 'founder_journey', 'builder_narrative',
+    'educational', 'product_spotlight', 'social_proof',
+];
+
+export interface GeneratedThread {
+    tweets: string[];
+    contentType: ContentType;
+    topic: string;
+    inputTokens: number;
+    outputTokens: number;
+}
+
+/**
+ * Generate a thread (3-5 tweets) for X.
+ */
+export async function generateThread(
+    options?: { strategyContext?: string },
+): Promise<GeneratedThread> {
+    const contentType = THREAD_TYPES[Math.floor(Math.random() * THREAD_TYPES.length)];
+    const [intelContext, marketContext] = await Promise.all([
+        gatherIntelContext(),
+        gatherMarketContext().catch(() => ''),
+    ]);
+    const combinedContext = [intelContext, marketContext].filter(Boolean).join('\n\n');
+    const timeContext = getTimeContext();
+
+    log.info(`Generating ${contentType} thread for X`);
+
+    const result = await generate({
+        prompt: `Generate a ${contentType.replace(/_/g, ' ')} THREAD (3-5 tweets).
+
+For X/Twitter. Each tweet MUST be under 280 characters. No hashtags.
+
+RULES:
+- Separate each tweet with "---" on its own line
+- Tweet 1: Hook — grab attention, make people want to read more
+- Tweet 2-4: The substance — data, story, insight
+- Final tweet: The closer — a takeaway, CTA, or memorable line
+- Write like a real person on crypto twitter, not an AI
+- Use real data from Lisan Intelligence if relevant
+- ANTI-SLOP: No banned phrases. No "dive in", "game changer", "buckle up", etc.
+
+MARKET DATA:
+${combinedContext.slice(0, 600)}
+
+Generate ONLY the thread tweets separated by "---". No preamble, no labels like "Tweet 1:", just the raw text:`,
+        strategyContext: options?.strategyContext,
+        timeContext,
+        maxTokens: 600,
+        temperature: 0.9,
+    });
+
+    // Parse tweets from the response
+    const rawTweets = result.content
+        .split(/\n---\n|\n-{3,}\n/)
+        .map(t => sanitizeContent(t.trim()))
+        .filter(t => t.length > 5 && t.length <= 280);
+
+    // Slop-check each tweet
+    const cleanTweets: string[] = [];
+    for (const tweet of rawTweets) {
+        const slop = detectSlop(tweet);
+        if (slop) {
+            log.warn(`Thread tweet contains slop: "${slop}" — skipping it`);
+            continue;
+        }
+        cleanTweets.push(tweet);
+    }
+
+    // Need at least 2 tweets for a thread
+    if (cleanTweets.length < 2) {
+        log.warn('Thread generation produced fewer than 2 clean tweets, padding with a closer');
+        cleanTweets.push('More signal. Less noise. lisanintel.com 🎯');
+    }
+
+    const topic = inferTopic(cleanTweets.join(' '));
+
+    return {
+        tweets: cleanTweets.slice(0, 5), // Cap at 5 tweets
+        contentType,
+        topic,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+    };
+}
+
 /** Infer the main topic from post content */
 export function inferTopic(content: string): string {
     const lower = content.toLowerCase();
