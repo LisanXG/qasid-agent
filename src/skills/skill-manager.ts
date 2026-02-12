@@ -22,7 +22,7 @@ import { recordAction } from '../engine/daily-budget.js';
 const log = createLogger('Skills');
 
 const BRAIN_KEY_SKILLS = 'qasid-skills';
-const FOUNDER_HANDLE = 'Lisantheresa';
+const FOUNDER_HANDLE = 'lisantherealone';
 
 // ---- Skill Definitions ----
 

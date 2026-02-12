@@ -82,7 +82,7 @@ function buildGenerationPrompt(
     intelContext: string,
     exclusions?: string,
 ): string {
-    const brandInfo = `BRAND: QasidAI is the autonomous CMO of Lisan Holdings. Products: LISAN Intelligence (AI trading signals), QasidAI (this agent), SigmaPips (Telegram signals), Net Protocol (on-chain storage).`;
+    const brandInfo = `BRAND: QasidAI is the autonomous CMO of Lisan Holdings. Products: LISAN Intelligence (quantitative crypto signals — lisanintel.com), LISAN Score (PineScript indicator for TradingView), QasidAI (this agent — on-chain brain via Net Protocol).`;
     const typeGuidance = `CONTENT TYPE: ${contentType.replace(/_/g, ' ')} — write ONE tweet (max 270 chars).`;
     const antiSlop = `RULES: No hashtags. No emojis at start. No corporate speak. Sound like a sharp crypto native, not a press release.
 BANNED PHRASES (never use these): "let's dive", "here's the thing", "game changer", "buckle up", "don't sleep on", "the future of", "excited to announce", "thrilled to", "this is huge", "revolutionize", "level up", "stay tuned", "not your average", "what if i told you", "picture this", "read that again", "you won't believe", "in the ever-evolving", "at the end of the day". Write like a HUMAN, not a marketing bot.`;

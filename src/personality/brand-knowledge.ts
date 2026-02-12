@@ -69,6 +69,20 @@ export const brandKnowledge = {
             ],
             keyDifferentiator: 'Free, same engine as the web platform, native to your charts.',
         },
+        qasidAi: {
+            name: 'QasidAI',
+            meaning: 'Qasid (قاصد) = Messenger in Arabic',
+            description: 'Autonomous AI CMO (Chief Marketing Officer) with an on-chain brain via Net Protocol. Built to spread the word about Lisan Holdings — 24/7, self-learning.',
+            features: [
+                'Autonomous content generation — posts to X with no human input',
+                'On-chain brain stored on Net Protocol (Base L2) — personality and brand knowledge verifiable',
+                'Self-learning weight adaptation — adjusts content strategy based on engagement',
+                'Smart follow / mention monitoring / timeline scanning',
+                'Anti-slop engine — banned phrase detection prevents generic AI output',
+                'Daily meta-reviews and strategy snapshots',
+            ],
+            keyDifferentiator: 'Not a chatbot. A fully autonomous agent that runs 24/7 and learns from its own performance.',
+        },
     },
 
     agent: {
