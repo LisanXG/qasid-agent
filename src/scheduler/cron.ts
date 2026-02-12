@@ -102,46 +102,99 @@ async function runContentCycle(options?: { strategyContext?: string; crossPostTo
 
 /**
  * Start the content scheduler.
- * Default schedule:
- * - Morning (8 AM UTC):  Market regime + signal summary + Botchan cross-post
- * - Midday (14 PM UTC):  Feature highlight / educational
- * - Afternoon (18 PM UTC): Signal win celebration
- * - Evening (22 PM UTC): Engagement post
- * - Daily (1 AM UTC):    Score posts + adapt weights (learning engine)
+ * 10 content posts/day spread across waking hours (UTC):
+ * - 06:00 🌅 GM post (+ Botchan cross-post)
+ * - 08:00 📊 Market/signal data
+ * - 10:00 🧱 Builder narrative / founder journey
+ * - 12:00 💡 Educational / methodology
+ * - 14:00 🔥 Engagement / hot take
+ * - 16:00 📦 Product spotlight
+ * - 18:00 🤖 Self-aware / meta AI commentary
+ * - 20:00 📈 Signal/performance / proof
+ * - 22:00 🧠 Engagement bait / cult vibes
+ * - 23:30 🌙 Evening reflection / builder log
+ *
+ * Learning engine crons:
+ * - Daily (1 AM UTC):    Score posts + adapt weights
  * - Weekly (Sun 2 AM UTC): Meta-review (performance report)
+ * - Daily (11:59 PM UTC): Summary to Net Protocol
  */
 export function startScheduler(): void {
-    log.info('Starting content scheduler...');
+    log.info('Starting content scheduler (10 posts/day)...');
 
     if (!isXConfigured) {
         log.warn('X not configured! Scheduler has nothing to do.');
         return;
     }
 
-    // Morning — 8 AM UTC (includes Botchan cross-post, once per day)
-    const morning = cron.schedule('0 8 * * *', async () => {
-        log.info('⏰ Morning cycle starting (+ Botchan cross-post)');
+    // ---- 10 Content Cycles / Day ----
+
+    // 06:00 UTC — 🌅 GM post (+ Botchan cross-post)
+    const gm = cron.schedule('0 6 * * *', async () => {
+        log.info('🌅 GM cycle starting (+ Botchan cross-post)');
         await runContentCycle({ crossPostToBotchan: true });
     }, { timezone: 'UTC' });
-    activeTasks.push(morning);
+    activeTasks.push(gm);
 
-    // Midday — 2 PM UTC
-    const midday = cron.schedule('0 14 * * *', async () => {
-        log.info('⏰ Midday cycle starting');
+    // 08:00 UTC — 📊 Market / signal data
+    const marketData = cron.schedule('0 8 * * *', async () => {
+        log.info('📊 Market data cycle starting');
         await runContentCycle();
     }, { timezone: 'UTC' });
-    activeTasks.push(midday);
+    activeTasks.push(marketData);
 
-    // Afternoon — 6 PM UTC
-    const afternoon = cron.schedule('0 18 * * *', async () => {
-        log.info('⏰ Afternoon cycle starting');
+    // 10:00 UTC — 🧱 Builder narrative / founder journey
+    const builder = cron.schedule('0 10 * * *', async () => {
+        log.info('🧱 Builder narrative cycle starting');
         await runContentCycle();
     }, { timezone: 'UTC' });
-    activeTasks.push(afternoon);
+    activeTasks.push(builder);
 
-    // Evening — 10 PM UTC
-    const evening = cron.schedule('0 22 * * *', async () => {
-        log.info('⏰ Evening cycle starting');
+    // 12:00 UTC — 💡 Educational
+    const educational = cron.schedule('0 12 * * *', async () => {
+        log.info('💡 Educational cycle starting');
+        await runContentCycle();
+    }, { timezone: 'UTC' });
+    activeTasks.push(educational);
+
+    // 14:00 UTC — 🔥 Engagement / hot take
+    const engagement = cron.schedule('0 14 * * *', async () => {
+        log.info('🔥 Engagement cycle starting');
+        await runContentCycle();
+    }, { timezone: 'UTC' });
+    activeTasks.push(engagement);
+
+    // 16:00 UTC — 📦 Product spotlight
+    const product = cron.schedule('0 16 * * *', async () => {
+        log.info('📦 Product spotlight cycle starting');
+        await runContentCycle();
+    }, { timezone: 'UTC' });
+    activeTasks.push(product);
+
+    // 18:00 UTC — 🤖 Self-aware / meta AI
+    const selfAware = cron.schedule('0 18 * * *', async () => {
+        log.info('🤖 Self-aware cycle starting');
+        await runContentCycle();
+    }, { timezone: 'UTC' });
+    activeTasks.push(selfAware);
+
+    // 20:00 UTC — 📈 Signal performance / proof
+    const performance = cron.schedule('0 20 * * *', async () => {
+        log.info('📈 Performance cycle starting');
+        await runContentCycle();
+    }, { timezone: 'UTC' });
+    activeTasks.push(performance);
+
+    // 22:00 UTC — 🧠 Engagement bait / cult vibes
+    const lateEngagement = cron.schedule('0 22 * * *', async () => {
+        log.info('🧠 Late engagement cycle starting');
+        await runContentCycle();
+    }, { timezone: 'UTC' });
+    activeTasks.push(lateEngagement);
+
+    // 23:30 UTC — 🌙 Evening reflection
+    const evening = cron.schedule('30 23 * * *', async () => {
+        log.info('🌙 Evening reflection cycle starting');
         await runContentCycle();
     }, { timezone: 'UTC' });
     activeTasks.push(evening);
@@ -173,9 +226,9 @@ export function startScheduler(): void {
     activeTasks.push(weeklyReview);
     log.info('📊 Weekly meta-review cron active (Sun 2 AM UTC)');
 
-    // End-of-day — 11:59 PM UTC — Daily summary to Net Protocol
+    // End-of-day — 11:55 PM UTC — Daily summary to Net Protocol (before the 23:30 reflection)
     if (isNetConfigured) {
-        const dailySummary = cron.schedule('59 23 * * *', async () => {
+        const dailySummary = cron.schedule('55 23 * * *', async () => {
             log.info('⏰ End-of-day: writing daily summary to Net Protocol');
             try {
                 await buildAndWriteDailySummary();
@@ -184,14 +237,14 @@ export function startScheduler(): void {
             }
         }, { timezone: 'UTC' });
         activeTasks.push(dailySummary);
-        log.info('📝 Daily summary cron job active (11:59 PM UTC → Net Protocol)');
+        log.info('📝 Daily summary cron active (11:55 PM UTC → Net Protocol)');
     }
 
     if (isNetConfigured) {
-        log.info('⛓️  Botchan cross-post active (morning cycle → 1 post/day)');
+        log.info('⛓️  Botchan cross-post active (GM cycle → 1 post/day)');
     }
 
-    log.info(`Scheduler started with ${activeTasks.length} cron jobs`);
+    log.info(`Scheduler started with ${activeTasks.length} cron jobs (10 posts/day)`);
 }
 
 /**

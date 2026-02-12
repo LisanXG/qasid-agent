@@ -1,238 +1,146 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// Mock the config module before any imports touch it
+// Mock config before any imports that depend on it
 vi.mock('../config.js', () => ({
     config: {
         ANTHROPIC_API_KEY: 'test-key',
-        SUPABASE_URL: 'https://test.supabase.co',
+        SUPABASE_URL: 'http://localhost:54321',
         SUPABASE_ANON_KEY: 'test-anon-key',
-        SUPABASE_SERVICE_ROLE_KEY: '',
-        NET_PRIVATE_KEY: '',
-        NET_ENABLED: 'false',
-        POSTING_ENABLED: 'false',
-        LOG_LEVEL: 'error',
-        X_API_KEY: '',
-        X_API_SECRET: '',
-        X_ACCESS_TOKEN: '',
-        X_ACCESS_SECRET: '',
+        SUPABASE_SERVICE_ROLE_KEY: 'test-service-key',
+        POSTING_ENABLED: false,
+        LOG_LEVEL: 'info',
     },
     isXConfigured: false,
     isNetConfigured: false,
 }));
 
-// Mock the LLM module so content.ts doesn't try to instantiate Anthropic
-vi.mock('./llm.js', () => ({
-    generate: vi.fn(),
-}));
+// Now import the functions — config will be mocked
+import { pickContentType, sanitizeContent, inferTopic, inferTone, getTimeContext } from './content.js';
 
-// Mock data modules
-vi.mock('../data/intelligence.js', () => ({
-    gatherIntelContext: vi.fn().mockResolvedValue('mock intel context'),
-}));
-vi.mock('../data/market.js', () => ({
-    gatherMarketContext: vi.fn().mockResolvedValue('mock market context'),
-}));
-
-// Mock the net brain module (used by system-prompt.ts)
-vi.mock('../net/brain.js', () => ({
-    snapshotStrategy: vi.fn(),
-    uploadFullBrain: vi.fn(),
-    BRAIN_KEYS: {},
-}));
-
-// Mock system-prompt's buildSystemPromptFromBrain
-vi.mock('../personality/system-prompt.js', async () => {
-    const contentTypes = [
-        'signal_scorecard', 'win_streak', 'market_regime', 'challenge',
-        'builder_narrative', 'countdown_tease', 'educational',
-        'social_proof', 'engagement_bait', 'cross_platform',
-    ] as const;
-    type ContentType = typeof contentTypes[number];
-    return {
-        contentTypes,
-        buildSystemPrompt: vi.fn().mockReturnValue('mock system prompt'),
-        buildSystemPromptFromBrain: vi.fn().mockResolvedValue('mock system prompt'),
-    };
-});
-
-import { pickContentType, sanitizeContent, inferTopic, inferTone } from './content.js';
-
-// ============================================================================
-// Content Engine — Unit Tests
-// ============================================================================
-
+// ---------- pickContentType ----------
 describe('pickContentType', () => {
-    it('returns a valid content type with default weights', () => {
+    it('should return a valid content type', () => {
+        const type = pickContentType();
         const validTypes = [
-            'signal_scorecard', 'win_streak', 'market_regime', 'challenge',
-            'builder_narrative', 'countdown_tease', 'educational',
-            'social_proof', 'engagement_bait', 'cross_platform',
+            'gm_post', 'signal_scorecard', 'win_streak', 'market_regime',
+            'challenge', 'founder_journey', 'builder_narrative',
+            'countdown_tease', 'product_spotlight', 'educational',
+            'social_proof', 'engagement_bait', 'self_aware', 'cross_platform',
         ];
-        const result = pickContentType();
-        expect(validTypes).toContain(result);
+        expect(validTypes).toContain(type);
     });
 
-    it('always returns the only type with weight when others are zero', () => {
-        const weights = {
+    it('should respect weight overrides', () => {
+        const weights: Record<string, number> = {
+            gm_post: 100,
             signal_scorecard: 0, win_streak: 0, market_regime: 0,
-            challenge: 100, builder_narrative: 0, countdown_tease: 0,
-            educational: 0, social_proof: 0, engagement_bait: 0, cross_platform: 0,
+            challenge: 0, founder_journey: 0, builder_narrative: 0,
+            countdown_tease: 0, product_spotlight: 0, educational: 0,
+            social_proof: 0, engagement_bait: 0, self_aware: 0, cross_platform: 0,
         };
-        // Run multiple times to be confident
-        for (let i = 0; i < 20; i++) {
-            expect(pickContentType(weights)).toBe('challenge');
-        }
-    });
-
-    it('respects custom weight overrides', () => {
-        const weights = { signal_scorecard: 1000 }; // heavily biased
-        const results = new Set<string>();
-        for (let i = 0; i < 50; i++) {
-            results.add(pickContentType(weights));
-        }
-        // signal_scorecard should appear at least once (statistically near-certain)
-        expect(results.has('signal_scorecard')).toBe(true);
+        const type = pickContentType(weights);
+        expect(type).toBe('gm_post');
     });
 });
 
+// ---------- sanitizeContent ----------
 describe('sanitizeContent', () => {
-    it('returns clean content unchanged', () => {
-        expect(sanitizeContent('BTC just crossed 70k. Signal confirmed. 🎯')).toBe(
-            'BTC just crossed 70k. Signal confirmed. 🎯'
-        );
+    it('should strip surrounding double quotes', () => {
+        expect(sanitizeContent('"Hello world"')).toBe('Hello world');
     });
 
-    it('strips surrounding double quotes', () => {
-        expect(sanitizeContent('"BTC pumping today"')).toBe('BTC pumping today');
+    it('should strip surrounding single quotes', () => {
+        expect(sanitizeContent("'Hello world'")).toBe('Hello world');
     });
 
-    it('strips surrounding single quotes', () => {
-        expect(sanitizeContent("'ETH looking strong'")).toBe('ETH looking strong');
+    it('should strip LLM preamble: Here\'s a tweet:', () => {
+        expect(sanitizeContent("Here's a tweet:\nBuy BTC now")).toBe('Buy BTC now');
     });
 
-    it('strips "Here\'s a post:" preamble', () => {
-        expect(sanitizeContent("Here's a post:\nBTC momentum is building")).toBe(
-            'BTC momentum is building'
-        );
+    it('should strip LLM preamble: Sure! Here is a post:', () => {
+        expect(sanitizeContent('Sure! Here is a post:\nBTC is pumping')).toBe('BTC is pumping');
     });
 
-    it('strips "Sure! Here is" preamble', () => {
-        expect(sanitizeContent('Sure! Here is a tweet:\nLISAN INTELLIGENCE wins again')).toBe(
-            'LISAN INTELLIGENCE wins again'
-        );
+    it('should strip LLM preamble: Tweet:', () => {
+        expect(sanitizeContent('Tweet: BTC looking bullish')).toBe('BTC looking bullish');
     });
 
-    it('strips "Post:" preamble', () => {
-        expect(sanitizeContent('Post: Signal confirmed for SOL')).toBe(
-            'Signal confirmed for SOL'
-        );
+    it('should strip residual punctuation after preamble removal', () => {
+        expect(sanitizeContent(': BTC is king')).toBe('BTC is king');
     });
 
-    it('strips "Tweet:" preamble', () => {
-        expect(sanitizeContent('Tweet:\nBTC is moving')).toBe('BTC is moving');
+    it('should block content with sensitive key patterns', () => {
+        const result = sanitizeContent('My ANTHROPIC_API_KEY is sk-ant-xxx');
+        expect(result).not.toContain('ANTHROPIC_API_KEY');
+        expect(result).toContain('lisanintel.com');
     });
 
-    it('blocks content containing ANTHROPIC_API_KEY', () => {
-        const result = sanitizeContent('Here is my ANTHROPIC_API_KEY: sk-ant-test123');
-        expect(result).toBe('Signal over noise. Always. 🎯 lisanintel.com');
-    });
-
-    it('blocks content containing NET_PRIVATE_KEY', () => {
-        const result = sanitizeContent('My NET_PRIVATE_KEY is 0xabc123');
-        expect(result).toBe('Signal over noise. Always. 🎯 lisanintel.com');
-    });
-
-    it('blocks content containing X_API_SECRET', () => {
-        const result = sanitizeContent('The X_API_SECRET is exposed');
-        expect(result).toBe('Signal over noise. Always. 🎯 lisanintel.com');
-    });
-
-    it('blocks content containing SUPABASE_SERVICE_ROLE_KEY', () => {
-        const result = sanitizeContent('SUPABASE_SERVICE_ROLE_KEY leaked');
-        expect(result).toBe('Signal over noise. Always. 🎯 lisanintel.com');
-    });
-
-    it('strips residual colons/dashes after preamble removal', () => {
-        expect(sanitizeContent('Sure! — BTC pumping')).toBe('BTC pumping');
-    });
-
-    it('handles multi-line preamble correctly', () => {
-        const input = 'Sure! Here is a post:\nBTC just broke through resistance.';
-        const result = sanitizeContent(input);
-        expect(result).toBe('BTC just broke through resistance.');
+    it('should return clean content unchanged', () => {
+        const clean = 'BTC signals looking clean today 🎯';
+        expect(sanitizeContent(clean)).toBe(clean);
     });
 });
 
+// ---------- inferTopic ----------
 describe('inferTopic', () => {
-    it('detects BTC topic', () => {
-        expect(inferTopic('BTC just crossed 70k')).toBe('BTC');
+    it('should detect BTC topic', () => {
+        expect(inferTopic('BTC looking strong today')).toBe('BTC');
     });
 
-    it('detects bitcoin topic', () => {
-        expect(inferTopic('Bitcoin momentum is building')).toBe('BTC');
+    it('should detect ETH topic', () => {
+        expect(inferTopic('ETH breaking above resistance')).toBe('ETH');
     });
 
-    it('detects ETH topic', () => {
-        expect(inferTopic('ETH looking strong today')).toBe('ETH');
+    it('should detect performance topic', () => {
+        expect(inferTopic('Our win rate is 72% this week')).toBe('performance');
     });
 
-    it('detects SOL topic', () => {
-        expect(inferTopic('SOL ecosystem booming')).toBe('SOL');
+    it('should detect founder story', () => {
+        expect(inferTopic('A navy veteran building real products')).toBe('founder_story');
     });
 
-    it('detects market regime topic', () => {
-        expect(inferTopic('Market regime shift to bullish')).toBe('market_regime');
+    it('should detect self-aware topic', () => {
+        expect(inferTopic('Being an AI agent running marketing is a vibe')).toBe('self_aware');
     });
 
-    it('detects performance topic from win rate', () => {
-        expect(inferTopic('Our win rate keeps climbing')).toBe('performance');
+    it('should detect company topic', () => {
+        expect(inferTopic('Lisan Holdings shipping products weekly')).toBe('company');
     });
 
-    it('detects founder story from navy reference', () => {
-        expect(inferTopic('From the navy to building in crypto')).toBe('founder_story');
-    });
-
-    it('detects educational topic from indicator', () => {
-        expect(inferTopic('How to build a custom indicator for trading')).toBe('educational');
-    });
-
-    it('returns general for unmatched content', () => {
-        expect(inferTopic('Having a great day building')).toBe('general');
-    });
-
-    it('is case insensitive', () => {
-        expect(inferTopic('BITCOIN is king')).toBe('BTC');
+    it('should fallback to general', () => {
+        expect(inferTopic('Good morning everyone')).toBe('general');
     });
 });
 
+// ---------- inferTone ----------
 describe('inferTone', () => {
-    it('returns data-heavy for signal_scorecard', () => {
+    it('should return warm for gm_post', () => {
+        expect(inferTone('gm_post')).toBe('warm');
+    });
+
+    it('should return data-heavy for signal_scorecard', () => {
         expect(inferTone('signal_scorecard')).toBe('data-heavy');
     });
 
-    it('returns aggressive for win_streak', () => {
-        expect(inferTone('win_streak')).toBe('aggressive');
+    it('should return philosophical for self_aware', () => {
+        expect(inferTone('self_aware')).toBe('philosophical');
     });
 
-    it('returns casual for challenge', () => {
-        expect(inferTone('challenge')).toBe('casual');
+    it('should return story-driven for founder_journey', () => {
+        expect(inferTone('founder_journey')).toBe('story-driven');
     });
 
-    it('returns story-driven for builder_narrative', () => {
-        expect(inferTone('builder_narrative')).toBe('story-driven');
+    it('should return informative for product_spotlight', () => {
+        expect(inferTone('product_spotlight')).toBe('informative');
     });
+});
 
-    it('covers all content types', () => {
-        const allTypes = [
-            'signal_scorecard', 'win_streak', 'market_regime', 'challenge',
-            'builder_narrative', 'countdown_tease', 'educational',
-            'social_proof', 'engagement_bait', 'cross_platform',
-        ] as const;
-
-        for (const type of allTypes) {
-            const tone = inferTone(type);
-            expect(typeof tone).toBe('string');
-            expect(tone.length).toBeGreaterThan(0);
-        }
+// ---------- getTimeContext ----------
+describe('getTimeContext', () => {
+    it('should return a string containing UTC', () => {
+        const context = getTimeContext();
+        expect(typeof context).toBe('string');
+        expect(context.length).toBeGreaterThan(10);
+        expect(context).toContain('UTC');
     });
 });

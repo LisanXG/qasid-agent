@@ -25,6 +25,8 @@ export interface GenerateOptions {
     prompt: string;
     /** Optional strategy context from learning engine */
     strategyContext?: string;
+    /** Optional time-of-day context for content tone */
+    timeContext?: string;
     /** Max tokens for response */
     maxTokens?: number;
     /** Temperature (0-1, higher = more creative) */
@@ -39,9 +41,9 @@ export interface GenerateResult {
 }
 
 export async function generate(options: GenerateOptions): Promise<GenerateResult> {
-    const { prompt, strategyContext, maxTokens = 300, temperature = 0.9 } = options;
+    const { prompt, strategyContext, timeContext, maxTokens = 300, temperature = 0.9 } = options;
 
-    const systemPrompt = await buildSystemPromptFromBrain(strategyContext);
+    const systemPrompt = await buildSystemPromptFromBrain(strategyContext, timeContext);
 
     log.debug('Generating content', { promptLength: prompt.length, maxTokens, temperature });
 

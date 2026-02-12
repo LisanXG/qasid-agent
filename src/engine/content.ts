@@ -24,17 +24,36 @@ export interface GeneratedPost {
 
 /** Default content type weights (learning engine overrides these) */
 const defaultWeights: Record<ContentType, number> = {
-    signal_scorecard: 15,
-    win_streak: 10,
-    market_regime: 12,
-    challenge: 10,
-    builder_narrative: 10,
+    gm_post: 8,
+    signal_scorecard: 12,
+    win_streak: 8,
+    market_regime: 10,
+    challenge: 8,
+    founder_journey: 10,
+    builder_narrative: 8,
     countdown_tease: 5,
-    educational: 12,
-    social_proof: 8,
-    engagement_bait: 10,
-    cross_platform: 8,
+    product_spotlight: 10,
+    educational: 10,
+    social_proof: 6,
+    engagement_bait: 12,
+    self_aware: 8,
+    cross_platform: 5,
 };
+
+/**
+ * Get a human-readable time context string for the current UTC hour.
+ */
+export function getTimeContext(): string {
+    const hour = new Date().getUTCHours();
+
+    if (hour >= 5 && hour < 9) return `It's early morning (${hour}:00 UTC). GM energy — start the day with a greeting and a real take. Keep it warm but don't be corny.`;
+    if (hour >= 9 && hour < 12) return `It's mid-morning (${hour}:00 UTC). Markets are active. Good time for data, signals, and market observations.`;
+    if (hour >= 12 && hour < 15) return `It's midday (${hour}:00 UTC). Peak engagement hours. Education, product highlights, or a hot take.`;
+    if (hour >= 15 && hour < 18) return `It's afternoon (${hour}:00 UTC). Good time for engagement — questions, challenges, or witty observations.`;
+    if (hour >= 18 && hour < 21) return `It's evening (${hour}:00 UTC). Reflective energy. Builder stories, journey recaps, or meta-commentary about being an AI.`;
+    if (hour >= 21 && hour < 24) return `It's late night (${hour}:00 UTC). Unhinged posting hours. Hot takes, cult vibes, schizo founder energy. Go wild but stay sharp.`;
+    return `It's late night / early morning (${hour}:00 UTC). Quiet hours. Philosophical, reflective, or just a vibe post.`;
+}
 
 /**
  * Pick a content type based on weights (weighted random selection).
@@ -50,7 +69,7 @@ export function pickContentType(weights?: Partial<Record<ContentType, number>>):
         if (random <= 0) return type;
     }
 
-    return 'signal_scorecard'; // fallback
+    return 'engagement_bait'; // fallback
 }
 
 /**
@@ -62,9 +81,9 @@ function buildGenerationPrompt(
 ): string {
     return `Generate a ${contentType.replace(/_/g, ' ')} post.
 
-For X/Twitter. Keep under 280 characters. No hashtags unless very natural. Punchy and direct.
+For X/Twitter. Keep under 280 characters. No hashtags unless very natural. Punchy and direct. Write like a real person on crypto twitter — not like an AI reading a marketing brief.
 
-Here is current live data from LISAN Intelligence to reference (use real numbers if relevant):
+Here is current live data from Lisan Intelligence to reference (use real numbers if relevant):
 
 ${intelContext}
 
@@ -88,12 +107,14 @@ export async function generatePost(
     ]);
     const combinedContext = [intelContext, marketContext].filter(Boolean).join('\n\n');
     const prompt = buildGenerationPrompt(contentType, combinedContext);
+    const timeContext = getTimeContext();
 
     log.info(`Generating ${contentType} for X`);
 
     const result = await generate({
         prompt,
         strategyContext: options?.strategyContext,
+        timeContext,
         maxTokens: 150,
         temperature: 0.9,
     });
@@ -135,6 +156,9 @@ export function inferTopic(content: string): string {
         { keyword: 'navy', topic: 'founder_story' }, { keyword: 'veteran', topic: 'founder_story' },
         { keyword: 'lisan score', topic: 'lisan_score' }, { keyword: 'tradingview', topic: 'lisan_score' },
         { keyword: 'indicator', topic: 'educational' },
+        { keyword: 'lisan holdings', topic: 'company' },
+        { keyword: 'qasid', topic: 'self_aware' },
+        { keyword: 'ai agent', topic: 'self_aware' },
     ];
 
     for (const { keyword, topic } of topics) {
@@ -146,15 +170,19 @@ export function inferTopic(content: string): string {
 /** Map content type to a rough tone */
 export function inferTone(contentType: ContentType): string {
     const toneMap: Record<ContentType, string> = {
+        gm_post: 'warm',
         signal_scorecard: 'data-heavy',
         win_streak: 'aggressive',
         market_regime: 'data-heavy',
         challenge: 'casual',
+        founder_journey: 'story-driven',
         builder_narrative: 'story-driven',
         countdown_tease: 'aggressive',
+        product_spotlight: 'informative',
         educational: 'casual',
         social_proof: 'data-heavy',
         engagement_bait: 'casual',
+        self_aware: 'philosophical',
         cross_platform: 'casual',
     };
     return toneMap[contentType] || 'casual';
@@ -202,4 +230,3 @@ export function sanitizeContent(raw: string): string {
 
     return text.trim();
 }
-

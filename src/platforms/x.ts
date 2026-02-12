@@ -85,3 +85,38 @@ export async function postThread(tweets: string[]): Promise<string[]> {
 
     return ids;
 }
+
+/**
+ * Post a tweet with an image attachment. Returns the tweet ID.
+ * @param text Tweet text
+ * @param imageBuffer The image data as a Buffer
+ * @param mimeType MIME type of the image (default: image/png)
+ */
+export async function postTweetWithImage(
+    text: string,
+    imageBuffer: Buffer,
+    mimeType: string = 'image/png',
+): Promise<string | null> {
+    if (!config.POSTING_ENABLED) {
+        log.info('[DRY RUN] Would post tweet with image:', { text, imageSize: imageBuffer.length });
+        return `dry-run-img-${Date.now()}`;
+    }
+
+    try {
+        // Upload the image via v1 media upload
+        const mediaId = await getClient().v1.uploadMedia(imageBuffer, {
+            mimeType,
+        });
+        log.info('Image uploaded to X', { mediaId, size: imageBuffer.length });
+
+        // Post tweet with the uploaded media
+        const result = await getClient().v2.tweet(text, {
+            media: { media_ids: [mediaId] },
+        });
+        log.info('Tweet with image posted', { id: result.data.id, length: text.length });
+        return result.data.id;
+    } catch (error: any) {
+        log.error('Failed to post tweet with image', { error: String(error) });
+        return null;
+    }
+}
