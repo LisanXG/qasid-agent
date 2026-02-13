@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { generate } from '../engine/llm.js';
 import { config, isNetConfigured } from '../config.js';
 import { createLogger } from '../logger.js';
+import { getWalletAddress } from './client.js';
 import { recordAction, canTakeAction } from '../engine/daily-budget.js';
 
 // ============================================================================
@@ -353,10 +354,7 @@ function getOurAddress(): string | null {
     if (cachedAddress) return cachedAddress;
 
     try {
-        // Derive address from private key using viem
-        const { privateKeyToAccount } = require('viem/accounts');
-        const account = privateKeyToAccount(config.NET_PRIVATE_KEY as `0x${string}`);
-        cachedAddress = account.address;
+        cachedAddress = getWalletAddress();
         return cachedAddress;
     } catch {
         log.warn('Could not derive wallet address from NET_PRIVATE_KEY');
