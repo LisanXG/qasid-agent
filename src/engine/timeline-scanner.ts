@@ -1,4 +1,5 @@
 import { generate } from './llm.js';
+import { sanitizeContent } from './content.js';
 import { searchRecentTweets, replyToTweet, type SearchResult } from '../platforms/x.js';
 import { gatherIntelContext } from '../data/intelligence.js';
 import { supabase } from '../supabase.js';
@@ -163,6 +164,9 @@ REPLY: [your reply text, or "none"]`;
 
         // Strip quotes if LLM wrapped the reply
         reply = reply.replace(/^["']|["']$/g, '');
+
+        // Run through full output sanitization (URL allowlist, secret detection, wallet blocking)
+        reply = sanitizeContent(reply);
 
         // Safety: enforce 280 char limit
         if (reply.length > 280) {

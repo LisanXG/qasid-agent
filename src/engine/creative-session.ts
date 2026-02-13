@@ -1,5 +1,5 @@
 import { generate } from './llm.js';
-import { generatePost, generateThread } from './content.js';
+import { generatePost, generateThread, sanitizeContent } from './content.js';
 import { searchRecentTweets, replyToTweet, getMentions, postThread, postTweetWithImage, type SearchResult, type MentionTweet } from '../platforms/x.js';
 import { generateScorecardImage } from './scorecard-image.js';
 import { gatherIntelContext } from '../data/intelligence.js';
@@ -111,12 +111,14 @@ Reply with ONLY the tweet text (or "SKIP"):`,
             temperature: 0.9,
         });
 
-        const reply = result.content.trim().replace(/^["']|["']$/g, '');
+        let reply = result.content.trim().replace(/^["']|["']$/g, '');
         if (reply.toUpperCase().startsWith('SKIP') || reply.length < 5) continue;
+        reply = sanitizeContent(reply);
 
         const replyId = await replyToTweet(tweet.id, reply);
         if (replyId) {
             await recordReply(tweet.id, tweet.authorUsername ?? tweet.authorId, replyId, reply, 'creative-trending');
+            // Record budget AFTER successful post (reply is already posted, recording is bookkeeping)
             await recordAction('reply', `Replied to @${tweet.authorUsername}: ${reply.slice(0, 60)}`, replyId);
             log.info('✅ Creative reply posted', { target: tweet.id, author: tweet.authorUsername });
             return true;
@@ -155,8 +157,9 @@ Reply with ONLY the tweet text (or "SKIP"):`,
             temperature: 0.85,
         });
 
-        const reply = result.content.trim().replace(/^["']|["']$/g, '');
+        let reply = result.content.trim().replace(/^["']|["']$/g, '');
         if (reply.toUpperCase().startsWith('SKIP') || reply.length < 5) continue;
+        reply = sanitizeContent(reply);
 
         const replyId = await replyToTweet(mention.id, reply);
         if (replyId) {
@@ -174,15 +177,19 @@ Reply with ONLY the tweet text (or "SKIP"):`,
  */
 async function executeBonusPost(): Promise<boolean> {
     const post = await generatePost();
-    // We don't post here — we return the content and let the cron handle posting
-    // Actually, let's post it directly since this is discretionary
     const { postTweet } = await import('../platforms/x.js');
     const { savePost } = await import('../engine/memory.js');
+
+    // Reserve budget BEFORE posting
+    const budgetOk = await recordAction('bonus_post', `Bonus ${post.contentType}: ${post.content.slice(0, 60)}`);
+    if (!budgetOk) {
+        log.warn('Budget reservation failed — skipping bonus post');
+        return false;
+    }
 
     const externalId = await postTweet(post.content);
     if (externalId) {
         await savePost(post, externalId);
-        await recordAction('bonus_post', `Bonus ${post.contentType}: ${post.content.slice(0, 60)}`, externalId);
         log.info('✅ Bonus post published', { contentType: post.contentType });
         return true;
     }
@@ -196,6 +203,13 @@ async function executeThread(): Promise<boolean> {
     const thread = await generateThread();
     if (thread.tweets.length < 2) {
         log.warn('Thread too short, skipping');
+        return false;
+    }
+
+    // Reserve budget BEFORE posting
+    const budgetOk = await recordAction('thread', `${thread.contentType} thread (${thread.tweets.length} tweets): ${thread.tweets[0].slice(0, 50)}`);
+    if (!budgetOk) {
+        log.warn('Budget reservation failed — skipping thread');
         return false;
     }
 
@@ -213,7 +227,6 @@ async function executeThread(): Promise<boolean> {
             outputTokens: thread.outputTokens,
             generatedAt: new Date().toISOString(),
         }, ids[0]);
-        await recordAction('thread', `${thread.contentType} thread (${ids.length} tweets): ${thread.tweets[0].slice(0, 50)}`, ids[0]);
         log.info('✅ Thread published', { tweets: ids.length, contentType: thread.contentType });
         return true;
     }
@@ -230,9 +243,15 @@ async function executeImagePost(): Promise<boolean> {
         return false;
     }
 
+    // Reserve budget BEFORE posting
+    const budgetOk = await recordAction('bonus_post', `Scorecard image: ${scorecard.caption.slice(0, 60)}`);
+    if (!budgetOk) {
+        log.warn('Budget reservation failed — skipping image post');
+        return false;
+    }
+
     const externalId = await postTweetWithImage(scorecard.caption, scorecard.buffer);
     if (externalId) {
-        await recordAction('bonus_post', `Scorecard image: ${scorecard.caption.slice(0, 60)}`, externalId);
         log.info('✅ Scorecard image posted', { tweetId: externalId });
         return true;
     }

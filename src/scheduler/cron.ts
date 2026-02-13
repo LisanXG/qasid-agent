@@ -91,6 +91,12 @@ async function runContentCycle(options?: {
                 log.warn('Still duplicate after retry, skipping this cycle');
                 return;
             }
+            // Reserve budget BEFORE posting (safer: wastes a slot if post fails, but prevents over-posting)
+            const budgetOk = await recordAction('scheduled_post', `${retry.contentType}: ${retry.content.slice(0, 60)}`);
+            if (!budgetOk) {
+                log.warn('Budget reservation failed — skipping post');
+                return;
+            }
             const externalId = await postTweet(retry.content);
             await savePost(retry, externalId ?? undefined);
             // Cross-post to Botchan if enabled
@@ -100,6 +106,13 @@ async function runContentCycle(options?: {
                     log.warn('Botchan cross-post failed (non-blocking)', { error: String(e).slice(0, 200) })
                 );
             }
+            return;
+        }
+
+        // Reserve budget BEFORE posting (safer: wastes a slot if post fails, but prevents over-posting)
+        const budgetOk = await recordAction('scheduled_post', `${post.contentType}: ${post.content.slice(0, 60)}`);
+        if (!budgetOk) {
+            log.warn('Budget reservation failed — skipping post');
             return;
         }
 
@@ -120,9 +133,6 @@ async function runContentCycle(options?: {
         log.info(`✅ Content cycle complete: ${post.contentType} → X${options?.crossPostToBotchan ? ' + Botchan' : ''}`, {
             contentLength: post.content.length,
         });
-
-        // Record against daily budget
-        await recordAction('scheduled_post', `${post.contentType}: ${post.content.slice(0, 60)}`, externalId ?? undefined);
     } catch (error) {
         log.error('Content cycle failed', { error: String(error) });
     }
@@ -176,10 +186,15 @@ export function startScheduler(): void {
             // Try to generate and post a scorecard image
             const scorecard = await generateScorecardImage();
             if (scorecard) {
+                // Reserve budget BEFORE posting
+                const budgetOk = await recordAction('scheduled_post', `signal_scorecard (image): ${scorecard.caption.slice(0, 60)}`);
+                if (!budgetOk) {
+                    log.warn('Budget reservation failed — skipping scorecard image');
+                    return;
+                }
                 const externalId = await postTweetWithImage(scorecard.caption, scorecard.buffer);
                 if (externalId) {
                     log.info('📊 Scorecard image posted', { tweetId: externalId });
-                    await recordAction('scheduled_post', `signal_scorecard (image): ${scorecard.caption.slice(0, 60)}`, externalId);
                     return;
                 }
             }

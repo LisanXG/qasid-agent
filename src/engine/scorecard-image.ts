@@ -86,8 +86,10 @@ function buildScorecardSvg(
     const padding = 40;
 
     const regime = engine.regime ?? 'UNKNOWN';
-    const regimeColor = regime === 'BULLISH' ? COLORS.green
-        : regime === 'BEARISH' ? COLORS.red
+    // Handle both legacy names (BULLISH/BEARISH) and v4.1 names (BULL_TREND/BEAR_TREND/RANGING/CHOPPY)
+    const regimeUpper = regime.toUpperCase();
+    const regimeColor = (regimeUpper.includes('BULL') || regimeUpper === 'BULLISH') ? COLORS.green
+        : (regimeUpper.includes('BEAR') || regimeUpper === 'BEARISH') ? COLORS.red
             : COLORS.yellow;
 
     const winRate = proof?.summary?.overallWinRate ?? '—';

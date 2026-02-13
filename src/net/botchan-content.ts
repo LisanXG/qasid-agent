@@ -3,7 +3,7 @@ import { gatherIntelContext } from '../data/intelligence.js';
 import { postToFeed } from './client.js';
 import { isNetConfigured } from '../config.js';
 import { createLogger } from '../logger.js';
-import { recordAction } from '../engine/daily-budget.js';
+import { recordAction, canTakeAction } from '../engine/daily-budget.js';
 
 // ============================================================================
 // QasidAI — Botchan Native Content Generator
@@ -61,7 +61,7 @@ const GITHUB_REPOS = [
 /** QasidAI capabilities to share */
 const AGENT_CAPABILITIES = [
     'I generate 13 scheduled posts/day with forced content variety — no two adjacent posts are the same type. I post around the clock, including late-night reflective content.',
-    'I have a 10-action discretionary budget. Every 6 hours I decide: reply to trending crypto tweets, engage with mentions, post bonus content, or drop a thread.',
+    'I have a 17-action discretionary budget on X (30 total). Plus 5 native Botchan posts. Every 6 hours I decide: reply to trending crypto tweets, engage with mentions, post bonus content, or drop a thread.',
     'I run a full anti-slop engine — 40+ banned AI phrases, auto-retry on bad output, per-tweet slop checking.',
     'I generate branded signal scorecards as images using live data from LISAN Intelligence. SVG → PNG, 1200x630, posted directly to X.',
     'I store my daily activity summaries on-chain via Net Protocol. Permanent, verifiable memory.',
@@ -209,12 +209,25 @@ Write ONLY the post text. Keep it conversational:`,
 export async function runBotchanContentCycle(
     preferredType?: BotchanContentType,
 ): Promise<boolean> {
+    // Check Botchan budget before generating content
+    const allowed = await canTakeAction('botchan_post');
+    if (!allowed) {
+        log.warn('Botchan budget exhausted — skipping content cycle');
+        return false;
+    }
+
     const post = await generateBotchanPost(preferredType);
     if (!post) return false;
 
     try {
+        // Reserve budget before posting
+        const budgetOk = await recordAction('botchan_post', `Botchan ${post.type}: ${post.text.slice(0, 60)}`);
+        if (!budgetOk) {
+            log.warn('Botchan budget reservation failed — skipping post');
+            return false;
+        }
+
         const txHash = await postToFeed(post.text, post.topic);
-        await recordAction('scheduled_post', `Botchan ${post.type}: ${post.text.slice(0, 60)}`, txHash);
         log.info(`✅ Botchan native post: ${post.type} → ${post.topic}`, {
             length: post.text.length,
             txHash,

@@ -57,7 +57,11 @@ export async function uploadProfile(customProfile?: Partial<AgentProfile>): Prom
         return null;
     }
 
-    const profile = { ...buildDefaultProfile(), ...customProfile, updatedAt: new Date().toISOString() };
+    // Read existing profile to preserve createdAt
+    const existing = await readProfile();
+    const createdAt = existing?.createdAt ?? new Date().toISOString();
+
+    const profile = { ...buildDefaultProfile(), ...customProfile, createdAt, updatedAt: new Date().toISOString() };
 
     try {
         const txHash = await writeStorage(

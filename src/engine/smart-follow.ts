@@ -100,14 +100,21 @@ async function followMentioners(budget: number): Promise<number> {
     }
 
     let followed = 0;
+
+    // Get our own user ID once (not per-iteration)
+    let myId: string;
+    try {
+        myId = await getMyUserId();
+    } catch (error) {
+        log.error('Failed to get own user ID, aborting follow cycle', { error: String(error) });
+        return 0;
+    }
+
     for (const [userId, username] of uniqueAuthors) {
         if (followed >= budget) break;
 
         // Skip self
-        try {
-            const myId = await getMyUserId();
-            if (userId === myId) continue;
-        } catch { continue; }
+        if (userId === myId) continue;
 
         // Skip if already followed
         if (await hasFollowed(userId)) continue;

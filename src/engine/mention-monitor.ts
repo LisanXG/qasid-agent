@@ -1,4 +1,5 @@
 import { generate } from './llm.js';
+import { sanitizeContent } from './content.js';
 import { getMentions, replyToTweet, getTweetById, type MentionTweet } from '../platforms/x.js';
 import { gatherIntelContext } from '../data/intelligence.js';
 import { supabase } from '../supabase.js';
@@ -23,6 +24,9 @@ const MAX_RESPONSES_PER_DAY = 15;
 
 // Prompt injection sanitization — shared utility
 import { sanitizeUserInput } from './sanitize-input.js';
+
+/** Max age of a mention to consider for replies (6 hours) */
+const MAX_MENTION_AGE_MS = 6 * 60 * 60 * 1000;
 
 // ---- Tracking ----
 
@@ -75,6 +79,7 @@ async function recordMentionResponse(
     targetAuthor: string,
     replyTweetId: string,
     replyText: string,
+    source: string = '@mention',
 ): Promise<void> {
     const { error } = await supabase
         .from('qasid_replies')
@@ -83,7 +88,7 @@ async function recordMentionResponse(
             target_author: targetAuthor,
             reply_tweet_id: replyTweetId,
             reply_text: replyText,
-            search_query: '@mention', // Tag as mention-sourced
+            search_query: source,
             replied_at: new Date().toISOString(),
         });
     if (error) {
@@ -174,6 +179,7 @@ REPLY: [your reply text, or "none"]`;
 
         let reply = replyMatch[1].trim();
         reply = reply.replace(/^["']|["']$/g, ''); // Strip wrapping quotes
+        reply = sanitizeContent(reply); // Full output sanitization (URL allowlist, secret detection, wallet blocking)
 
         // Safety: enforce X Premium limit (generous but not insane)
         if (reply.length > 2000) {
@@ -232,6 +238,7 @@ Reply text only:`;
 
         let reply = result.content.trim();
         reply = reply.replace(/^["']|["']$/g, '');
+        reply = sanitizeContent(reply); // Full output sanitization
 
         if (reply.length > 2000) {
             reply = reply.slice(0, 1997) + '...';
@@ -314,6 +321,15 @@ export async function runMentionMonitor(): Promise<number> {
             continue;
         }
 
+        // Skip stale mentions (older than 6h) — prevents re-replying when watermark is invalidated
+        if (mention.createdAt) {
+            const mentionAge = Date.now() - new Date(mention.createdAt).getTime();
+            if (mentionAge > MAX_MENTION_AGE_MS) {
+                log.debug('Skipping stale mention', { tweetId: mention.id, ageHours: (mentionAge / 3600000).toFixed(1) });
+                continue;
+            }
+        }
+
         // Check if this is a founder skill approval reply
         if (mention.authorUsername?.toLowerCase() === 'lisantherealone' && (mention.inReplyToTweetId || mention.conversationId)) {
             try {
@@ -380,15 +396,34 @@ export async function runMentionMonitor(): Promise<number> {
 
 // ---- Founder VIP Mention Check ----
 
-/** Founder's X handle — always gets a reply, never throttled */
+/** Founder's X handle — always gets a reply, prioritized over general mentions */
 const FOUNDER_HANDLE = 'lisantherealone';
+
+/** Safety cap: max founder replies per 24h (generous but bounded) */
+const MAX_FOUNDER_REPLIES_PER_DAY = 20;
+
+/**
+ * Count founder VIP replies in the last 24h (safety limit).
+ */
+async function getFounderRepliesLast24h(): Promise<number> {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+        .from('qasid_replies')
+        .select('id')
+        .eq('search_query', 'founder_vip')
+        .gte('replied_at', since);
+
+    if (error) {
+        log.warn('Failed to count founder replies', { error: error.message });
+        return MAX_FOUNDER_REPLIES_PER_DAY; // Fail safe: assume at limit
+    }
+    return data?.length ?? 0;
+}
 
 /**
  * Check for and reply to founder (@lisantherealone) mentions.
- * This runs on its own cron (every 15 min) and bypasses all limits:
- * - No daily cap
- * - No per-cycle cap
- * - No randomized throttle
+ * This runs on its own cron (every 15 min) and is prioritized:
+ * - Separate daily cap (generous but bounded for safety)
  * - Always replies with contextual, substantive content
  *
  * Unlike the general monitor, this does NOT use the watermark.
@@ -399,6 +434,13 @@ const FOUNDER_HANDLE = 'lisantherealone';
  * Returns the number of replies posted.
  */
 export async function runFounderMentionCheck(): Promise<number> {
+    // Safety check: daily limit even for founder replies
+    const founderRepliesCount = await getFounderRepliesLast24h();
+    if (founderRepliesCount >= MAX_FOUNDER_REPLIES_PER_DAY) {
+        log.warn(`🛑 Founder reply safety cap reached (${founderRepliesCount}/${MAX_FOUNDER_REPLIES_PER_DAY}), skipping`);
+        return 0;
+    }
+
     // Always fetch recent mentions WITHOUT watermark — scan a wide window
     // so we never miss a founder tag, even older ones
     const mentions = await getMentions(undefined, 50);
@@ -422,6 +464,15 @@ export async function runFounderMentionCheck(): Promise<number> {
         // Skip if already responded (check Supabase, not watermark)
         if (await hasRespondedTo(mention.id)) continue;
 
+        // Skip stale mentions (older than 6h) — prevents re-replying after tweet cleanup
+        if (mention.createdAt) {
+            const mentionAge = Date.now() - new Date(mention.createdAt).getTime();
+            if (mentionAge > MAX_MENTION_AGE_MS) {
+                log.debug('Skipping stale founder mention', { tweetId: mention.id, ageHours: (mentionAge / 3600000).toFixed(1) });
+                continue;
+            }
+        }
+
         // Check if this is a skill approval first
         if (mention.conversationId) {
             try {
@@ -432,7 +483,7 @@ export async function runFounderMentionCheck(): Promise<number> {
                         : `Got it — skipping ${approval.skill.name}. Your call. 🫡`;
                     const ackId = await replyToTweet(mention.id, ack);
                     if (ackId) {
-                        await recordMentionResponse(mention.id, FOUNDER_HANDLE, ackId, ack);
+                        await recordMentionResponse(mention.id, FOUNDER_HANDLE, ackId, ack, 'founder_vip');
                         replied++;
                     }
                     continue;
@@ -462,7 +513,7 @@ export async function runFounderMentionCheck(): Promise<number> {
         const replyId = await replyToTweet(mention.id, replyText);
 
         if (replyId) {
-            await recordMentionResponse(mention.id, FOUNDER_HANDLE, replyId, replyText);
+            await recordMentionResponse(mention.id, FOUNDER_HANDLE, replyId, replyText, 'founder_vip');
             replied++;
             log.info('👑 Replied to founder mention', {
                 replyId,

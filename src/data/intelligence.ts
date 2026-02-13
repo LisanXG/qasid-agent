@@ -16,6 +16,7 @@ export interface SignalBreakdown {
     trend: { score: number; max: number };
     volume: { score: number; max: number };
     sentiment: { score: number; max: number };
+    volatility: { score: number; max: number };
     positioning: { score: number; max: number };
 }
 
