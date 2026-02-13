@@ -305,3 +305,95 @@ export async function runMentionMonitor(): Promise<number> {
 
     return responded;
 }
+
+// ---- Founder VIP Mention Check ----
+
+/** Founder's X handle — always gets a reply, never throttled */
+const FOUNDER_HANDLE = 'lisantherealone';
+
+/**
+ * Check for and reply to founder (@lisantherealone) mentions.
+ * This runs on its own cron (every 15 min) and bypasses all limits:
+ * - No daily cap
+ * - No per-cycle cap
+ * - No randomized throttle
+ * - Always replies with contextual, substantive content
+ *
+ * Returns the number of replies posted.
+ */
+export async function runFounderMentionCheck(): Promise<number> {
+    // Get watermark — reuses the same watermark as the general monitor
+    // This is safe because we filter by founder handle only
+    const sinceId = await getLastMentionId();
+
+    // Fetch recent mentions
+    const mentions = await getMentions(sinceId, 20);
+    if (mentions.length === 0) return 0;
+
+    // Filter to founder only
+    const founderMentions = mentions.filter(
+        m => m.authorUsername?.toLowerCase() === FOUNDER_HANDLE,
+    );
+
+    if (founderMentions.length === 0) return 0;
+
+    log.info(`👑 Found ${founderMentions.length} founder mention(s) to process`);
+
+    // Fetch intel context once for all replies
+    const intelContext = await gatherIntelContext();
+
+    let replied = 0;
+
+    for (const mention of founderMentions) {
+        // Skip if already responded
+        if (await hasRespondedTo(mention.id)) continue;
+
+        // Check if this is a skill approval first
+        if (mention.conversationId) {
+            try {
+                const approval = await processSkillApproval(mention.text, mention.conversationId);
+                if (approval) {
+                    const ack = approval.approved
+                        ? `✅ Skill acquired: ${approval.skill.name}. Thanks boss, I'll put it to work.`
+                        : `Got it — skipping ${approval.skill.name}. Your call. 🫡`;
+                    const ackId = await replyToTweet(mention.id, ack);
+                    if (ackId) {
+                        await recordMentionResponse(mention.id, FOUNDER_HANDLE, ackId, ack);
+                        replied++;
+                    }
+                    continue;
+                }
+            } catch {
+                // Not a skill approval — continue to normal reply
+            }
+        }
+
+        // Draft a contextual response (LLM-powered)
+        const replyText = await draftMentionResponse(mention, intelContext);
+        if (!replyText) continue;
+
+        // Post the reply
+        const replyId = await replyToTweet(mention.id, replyText);
+
+        if (replyId) {
+            await recordMentionResponse(mention.id, FOUNDER_HANDLE, replyId, replyText);
+            replied++;
+            log.info('👑 Replied to founder mention', {
+                replyId,
+                targetMention: mention.id,
+                reply: replyText.slice(0, 80),
+            });
+        }
+    }
+
+    // Update watermark to newest mention (all mentions, not just founder)
+    const highestId = mentions.reduce(
+        (max, m) => (!max || m.id > max ? m.id : max),
+        sinceId,
+    );
+    if (highestId && highestId !== sinceId) {
+        await saveLastMentionId(highestId);
+    }
+
+    return replied;
+}

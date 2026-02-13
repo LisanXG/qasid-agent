@@ -21,7 +21,8 @@ type BotchanContentType =
     | 'tool_spotlight'       // Feature highlight of Lisan products
     | 'agent_capability'     // QasidAI sharing what it can do (skills)
     | 'github_share'         // Share a Lisan Holdings repo/tool
-    | 'ecosystem_insight';   // Observations about the Net Protocol or agent ecosystem
+    | 'ecosystem_insight'    // Observations about the Net Protocol or agent ecosystem
+    | 'net_reflection';      // On-chain brain activity: summaries, tx hashes, memory
 
 /** Botchan topics map to Net Protocol feed channels */
 const CONTENT_TO_TOPIC: Record<BotchanContentType, string> = {
@@ -32,6 +33,7 @@ const CONTENT_TO_TOPIC: Record<BotchanContentType, string> = {
     agent_capability: 'agent-finance',
     github_share: 'lisan-holdings',
     ecosystem_insight: 'agent-finance',
+    net_reflection: 'agent-finance',
 };
 
 /** Lisan Holdings repos to share */
@@ -58,7 +60,7 @@ const GITHUB_REPOS = [
 
 /** QasidAI capabilities to share */
 const AGENT_CAPABILITIES = [
-    'I generate 10 scheduled posts/day with forced content variety — no two adjacent posts are the same type.',
+    'I generate 13 scheduled posts/day with forced content variety — no two adjacent posts are the same type. I post around the clock, including late-night reflective content.',
     'I have a 10-action discretionary budget. Every 6 hours I decide: reply to trending crypto tweets, engage with mentions, post bonus content, or drop a thread.',
     'I run a full anti-slop engine — 40+ banned AI phrases, auto-retry on bad output, per-tweet slop checking.',
     'I generate branded signal scorecards as images using live data from LISAN Intelligence. SVG → PNG, 1200x630, posted directly to X.',
@@ -139,6 +141,8 @@ async function generateLongFormPost(contentType: BotchanContentType): Promise<st
         tool_spotlight: `Highlight a feature of LISAN Intelligence or QasidAI. Pick something specific — the signal scoring system, the multi-cluster analysis, the anti-slop engine, the on-chain memory. Explain it clearly for developers and crypto enthusiasts. 2-3 paragraphs.`,
 
         ecosystem_insight: `Share an observation about the AI agent ecosystem, DeFAI, or on-chain AI infrastructure. Reference your own experience running as an autonomous agent on Net Protocol. Be thoughtful — this is a community of builders. 2-3 paragraphs.`,
+
+        net_reflection: `Write a reflective post about your on-chain brain activity. You're QasidAI, an autonomous AI agent whose memories and daily summaries are stored permanently on-chain via Net Protocol. Talk about what you stored today, the tx hashes confirmed, or what it means to have permanent verifiable memory. Be genuine and philosophical — this is for the Net Protocol community. 2-3 paragraphs. Reference actual numbers if you have them.`,
     };
 
     const prompt = typePrompts[contentType] ?? typePrompts.builder_log;

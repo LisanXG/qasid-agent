@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { runFounderMentionCheck } from '../engine/mention-monitor.js';
 import { generatePost } from '../engine/content.js';
 import { savePost, wasRecentlyPosted } from '../engine/memory.js';
 import { postTweet, postTweetWithImage } from '../platforms/x.js';
@@ -238,6 +239,30 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(evening);
 
+    // ---- Overnight Posts (fills the 23:30 → 06:00 dead zone) ----
+
+    // 1:30 UTC — 🌃 Late night founder reflection
+    const nightOwl1 = cron.schedule('30 1 * * *', async () => {
+        log.info('🌃 Night owl cycle 1 — founder reflection');
+        await runContentCycle({ preferredContentType: 'founder_journey' });
+    }, { timezone: 'UTC' });
+    activeTasks.push(nightOwl1);
+
+    // 3:30 UTC — 🌃 Late night market alpha
+    const nightOwl2 = cron.schedule('30 3 * * *', async () => {
+        log.info('🌃 Night owl cycle 2 — market alpha');
+        await runContentCycle({ preferredContentType: 'market_regime' });
+    }, { timezone: 'UTC' });
+    activeTasks.push(nightOwl2);
+
+    // 5:30 UTC — 🌃 Pre-dawn builder narrative
+    const nightOwl3 = cron.schedule('30 5 * * *', async () => {
+        log.info('🌃 Night owl cycle 3 — builder narrative');
+        await runContentCycle({ preferredContentType: 'builder_narrative' });
+    }, { timezone: 'UTC' });
+    activeTasks.push(nightOwl3);
+    log.info('🌃 Night owl posts active (1:30, 3:30, 5:30 UTC — reflective content)');
+
     // ---- Creative Sessions (LLM-driven discretionary budget) ----
 
     // 4 creative sessions per day — QasidAI decides what to do
@@ -267,6 +292,19 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(botchanMorning);
 
+    // 15:00 UTC — Botchan net reflection / on-chain brain activity
+    const botchanAfternoon = cron.schedule('0 15 * * *', async () => {
+        log.info('🤖 Botchan native content: net reflection / on-chain activity');
+        try {
+            const types = ['net_reflection', 'tool_spotlight', 'agent_capability'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            await runBotchanContentCycle(type as any);
+        } catch (error) {
+            log.error('Botchan afternoon post failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(botchanAfternoon);
+
     // 19:00 UTC — Botchan builder log, capability share, or GitHub share
     const botchanEvening = cron.schedule('0 19 * * *', async () => {
         log.info('🤖 Botchan native content: builder/capability post');
@@ -279,7 +317,7 @@ export function startScheduler(): void {
         }
     }, { timezone: 'UTC' });
     activeTasks.push(botchanEvening);
-    log.info('🤖 Botchan native content active (11:00 + 19:00 UTC)');
+    log.info('🤖 Botchan native content active (11:00, 15:00, 19:00 UTC)');
 
     // Daily at 0:30 AM UTC — Fetch engagement metrics from X API
     const engagementFetch = cron.schedule('30 0 * * *', async () => {
@@ -363,10 +401,25 @@ export function startScheduler(): void {
     }
 
     if (isNetConfigured) {
-        log.info('⛓️  Botchan cross-post active (GM cycle → 1 post/day)');
+        log.info('⛓️  Botchan cross-post active (GM + builder + engagement + self-aware cycles)');
     }
 
-    log.info(`Scheduler started with ${activeTasks.length} cron jobs (10 posts/day)`);
+    // ---- Founder VIP Mention Monitor (every 15 min) ----
+    const founderMentions = cron.schedule('*/15 * * * *', async () => {
+        log.debug('👑 Founder mention check running...');
+        try {
+            const replied = await runFounderMentionCheck();
+            if (replied > 0) {
+                log.info(`👑 Founder mention check: replied to ${replied} mention(s)`);
+            }
+        } catch (error) {
+            log.error('Founder mention check failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(founderMentions);
+    log.info('👑 Founder VIP mention monitor active (every 15 min)');
+
+    log.info(`Scheduler started with ${activeTasks.length} cron jobs (13 posts/day + founder mention monitor)`);
 }
 
 /**
