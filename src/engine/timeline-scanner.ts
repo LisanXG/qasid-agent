@@ -168,10 +168,7 @@ REPLY: [your reply text, or "none"]`;
         // Run through full output sanitization (URL allowlist, secret detection, wallet blocking)
         reply = sanitizeContent(reply);
 
-        // Safety: enforce 280 char limit
-        if (reply.length > 280) {
-            reply = reply.slice(0, 277) + '...';
-        }
+        // No hard char limit (X Premium account) — prompt already constrains reply length
 
         return reply;
     } catch (error) {

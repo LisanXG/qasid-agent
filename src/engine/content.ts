@@ -237,10 +237,9 @@ export async function generatePost(
     // Add contextual @-mentions if relevant
     content = await addContextualMentions(content);
 
-    // Enforce tweet length limit
-    if (content.length > 280) {
-        log.warn(`Tweet too long (${content.length} chars), truncating to 280`);
-        content = content.slice(0, 277) + '...';
+    // Log length for monitoring (no hard limit — X Premium account)
+    if (content.length > 500) {
+        log.info(`Long post generated (${content.length} chars)`);
     }
 
     // Extract a rough topic from the content
@@ -311,7 +310,7 @@ export async function generateThread(
     const result = await generate({
         prompt: `Generate a ${contentType.replace(/_/g, ' ')} THREAD (3-5 tweets).
 
-For X/Twitter. Each tweet MUST be under 280 characters. No hashtags.
+For X/Twitter (Premium account — no 280 char limit). Each tweet should be punchy and concise — ideally under 400 chars. Don't pad tweets. No hashtags.
 
 RULES:
 - Separate each tweet with "---" on its own line
@@ -336,7 +335,7 @@ Generate ONLY the thread tweets separated by "---". No preamble, no labels like 
     const rawTweets = result.content
         .split(/\n---\n|\n-{3,}\n/)
         .map(t => sanitizeContent(t.trim()))
-        .filter(t => t.length > 5 && t.length <= 280);
+        .filter(t => t.length > 5);
 
     // Slop-check each tweet
     const cleanTweets: string[] = [];

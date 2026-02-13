@@ -198,19 +198,14 @@ describe('Strategy Context Generation', () => {
     assert(sortedTopics[0][0] === 'bitcoin', 'Top topic is bitcoin');
 });
 
-// ---- Test 8: Tweet Length Enforcement ----
+// ---- Test 8: Tweet Length Monitoring (Premium — no hard limit) ----
 
-describe('Tweet Length Enforcement', () => {
-    const enforce = (content: string): string => {
-        if (content.length > 280) return content.slice(0, 277) + '...';
-        return content;
-    };
-
-    assert(enforce('Short tweet').length <= 280, 'Short tweet untouched');
-    assert(enforce('x'.repeat(300)).length === 280, 'Long tweet truncated to 280');
-    assert(enforce('x'.repeat(300)).endsWith('...'), 'Truncated tweet ends with ...');
-    assert(enforce('x'.repeat(280)).length === 280, 'Exactly 280 chars untouched');
-    assert(enforce('x'.repeat(280)).endsWith('x'), 'Exactly 280 not truncated');
+describe('Tweet Length Monitoring (Premium — no hard limit)', () => {
+    // Premium account: no truncation, just monitoring
+    const isLong = (content: string): boolean => content.length > 500;
+    assert(!isLong('Short tweet'), 'Short tweet not flagged');
+    assert(isLong('x'.repeat(600)), 'Long post flagged for monitoring');
+    assert(!isLong('x'.repeat(400)), '400-char post not flagged');
 });
 
 // ---- Summary ----

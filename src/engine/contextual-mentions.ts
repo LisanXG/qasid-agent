@@ -97,11 +97,11 @@ function getCandidateAccounts(content: string): RelevantAccount[] {
  * - Max 1-2 mentions per post
  * - Only mention if it's natural and adds value
  * - Don't mention founder in every single post (feels fake)
- * - Never @-mention if the post is already close to 280 chars
+ * - Never @-mention if the post is already very long
  */
 export async function addContextualMentions(content: string): Promise<string> {
     // Skip if content is already near the limit
-    if (content.length > 240) {
+    if (content.length > 400) {
         log.info('Content too long for mentions, skipping');
         return content;
     }
@@ -135,7 +135,7 @@ RULES:
 - Only add a mention if it genuinely fits the content
 - Maximum 1 mention (2 only if both are directly relevant)
 - Weave the @-mention naturally into the sentence — don't just append it
-- Keep the total under 280 characters
+- Keep the total concise — don't make it longer than necessary
 - If none fit naturally, return the tweet unchanged
 - Do NOT add new text or change the meaning — only insert @handles where they fit
 
@@ -153,7 +153,7 @@ Return ONLY the final tweet text (with mentions if appropriate, or unchanged if 
         }
 
         // Safety: don't accept if it's way longer or drastically different
-        if (tweaked.length > 280 || tweaked.length < content.length * 0.5) {
+        if (tweaked.length > content.length + 50 || tweaked.length < content.length * 0.5) {
             log.warn('LLM mention edit rejected (length mismatch)', {
                 original: content.length,
                 modified: tweaked.length,
