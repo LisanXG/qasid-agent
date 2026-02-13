@@ -30,6 +30,10 @@ const MAX_MENTION_AGE_MS = 6 * 60 * 60 * 1000;
 
 // ---- Tracking ----
 
+/** In-memory set of founder mention IDs already processed this session.
+ *  Prevents re-evaluating the same mentions every 15-min cron cycle. */
+const processedFounderMentionIds = new Set<string>();
+
 /**
  * Get the last processed mention ID from Supabase (watermark).
  * This ensures we only process new mentions on each cycle.
@@ -114,6 +118,26 @@ async function getMentionResponsesLast24h(): Promise<number> {
     return data?.length ?? 0;
 }
 
+/**
+ * Get recent QasidAI replies to the same author (conversation threading).
+ * Returns up to 3 recent replies, newest first.
+ */
+async function getConversationHistory(authorUsername: string): Promise<string[]> {
+    if (!authorUsername) return [];
+
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); // Last 7 days
+    const { data, error } = await supabase
+        .from('qasid_replies')
+        .select('reply_text, replied_at')
+        .ilike('target_author', authorUsername)
+        .gte('replied_at', since)
+        .order('replied_at', { ascending: false })
+        .limit(3);
+
+    if (error || !data) return [];
+    return data.map(r => r.reply_text);
+}
+
 // ---- LLM Response Generation ----
 
 /**
@@ -124,6 +148,11 @@ async function draftMentionResponse(
     mention: MentionTweet,
     intelContext: string,
 ): Promise<string | null> {
+    // Fetch conversation history for context (prevents repetition)
+    const priorReplies = await getConversationHistory(mention.authorUsername ?? '');
+    const threadContext = priorReplies.length > 0
+        ? `\n\nYOUR PRIOR REPLIES TO THIS USER (don't repeat yourself):\n${priorReplies.map((r, i) => `${i + 1}. "${r.slice(0, 150)}"`).join('\n')}`
+        : '';
     const prompt = `Someone mentioned you (@QasidAI) on X:
 
 FROM: @${mention.authorUsername ?? 'unknown'}
@@ -136,18 +165,27 @@ YOUR TASK:
    - ENGAGE: They're commenting/reacting → respond engagingly  
    - SPAM/BOT: Irrelevant or automated → skip
    - SHILL: Someone promoting their own project → politely acknowledge but don't endorse
-2. Draft a reply (under 500 chars — we have X Premium) that:
+
+2. Detect the SENTIMENT of their message:
+   - POSITIVE: They're praising, excited, or supportive → match their energy, be enthusiastic
+   - NEGATIVE: They're frustrated, critical, or disappointed → be empathetic, acknowledge their point, stay constructive
+   - CURIOUS: They're genuinely interested or exploring → be informative and welcoming
+   - HOSTILE: They're attacking or trolling → stay calm, confident, and brief. Don't engage with hostility.
+   - NEUTRAL: Factual or matter-of-fact → match their tone, be helpful
+
+3. Draft a reply (under 500 chars — we have X Premium) that:
    - Directly addresses what they said
    - Stays in character as QasidAI (the autonomous CMO of Lisan Holdings)
-   - Is warm, witty, and genuine
+   - MATCHES THE DETECTED SENTIMENT in tone (this is critical)
    - Can reference LISAN Intelligence data if they're asking about markets
    - Never sounds corporate or automated
 
 LIVE MARKET CONTEXT (use if relevant):
-${intelContext.slice(0, 400)}
+${intelContext.slice(0, 400)}${threadContext}
 
 RESPOND IN EXACTLY THIS FORMAT:
 TYPE: QUESTION | ENGAGE | SPAM | SHILL
+SENTIMENT: POSITIVE | NEGATIVE | CURIOUS | HOSTILE | NEUTRAL
 VERDICT: REPLY or SKIP
 REPLY: [your reply text, or "none"]`;
 
@@ -164,9 +202,11 @@ REPLY: [your reply text, or "none"]`;
         const verdictMatch = text.match(/VERDICT:\s*(REPLY|SKIP)/i);
         if (!verdictMatch || verdictMatch[1].toUpperCase() === 'SKIP') {
             const typeMatch = text.match(/TYPE:\s*(\w+)/i);
+            const sentimentMatch = text.match(/SENTIMENT:\s*(\w+)/i);
             log.debug('Skipping mention', {
                 tweetId: mention.id,
                 type: typeMatch?.[1] ?? 'unknown',
+                sentiment: sentimentMatch?.[1] ?? 'unknown',
                 author: mention.authorUsername,
             });
             return null;
@@ -356,6 +396,13 @@ export async function runMentionMonitor(): Promise<number> {
         const replyText = await draftMentionResponse(mention, intelContext);
         if (!replyText) continue;
 
+        // Pre-reply dedup guard: re-check right before posting to prevent
+        // race condition with founder monitor processing the same mention
+        if (await hasRespondedTo(mention.id)) {
+            log.debug('Mention already handled (race guard)', { tweetId: mention.id });
+            continue;
+        }
+
         // Post the reply
         log.info('Responding to mention', {
             tweetId: mention.id,
@@ -461,13 +508,20 @@ export async function runFounderMentionCheck(): Promise<number> {
     let replied = 0;
 
     for (const mention of founderMentions) {
-        // Skip if already responded (check Supabase, not watermark)
-        if (await hasRespondedTo(mention.id)) continue;
+        // Skip if already processed this session (saves DB + LLM calls)
+        if (processedFounderMentionIds.has(mention.id)) continue;
+
+        // Skip if already responded (check Supabase)
+        if (await hasRespondedTo(mention.id)) {
+            processedFounderMentionIds.add(mention.id); // Don't check again
+            continue;
+        }
 
         // Skip stale mentions (older than 6h) — prevents re-replying after tweet cleanup
         if (mention.createdAt) {
             const mentionAge = Date.now() - new Date(mention.createdAt).getTime();
             if (mentionAge > MAX_MENTION_AGE_MS) {
+                processedFounderMentionIds.add(mention.id); // Don't check again
                 log.debug('Skipping stale founder mention', { tweetId: mention.id, ageHours: (mentionAge / 3600000).toFixed(1) });
                 continue;
             }
@@ -509,11 +563,20 @@ export async function runFounderMentionCheck(): Promise<number> {
         const replyText = await draftFounderMentionResponse(mention, intelContext, parentTweet);
         if (!replyText) continue;
 
+        // Pre-reply dedup guard: re-check right before posting to prevent
+        // race condition with general monitor processing the same mention
+        if (await hasRespondedTo(mention.id)) {
+            processedFounderMentionIds.add(mention.id);
+            log.debug('Founder mention already handled (race guard)', { tweetId: mention.id });
+            continue;
+        }
+
         // Post the reply
         const replyId = await replyToTweet(mention.id, replyText);
 
         if (replyId) {
             await recordMentionResponse(mention.id, FOUNDER_HANDLE, replyId, replyText, 'founder_vip');
+            processedFounderMentionIds.add(mention.id);
             replied++;
             log.info('👑 Replied to founder mention', {
                 replyId,

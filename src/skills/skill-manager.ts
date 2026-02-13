@@ -24,6 +24,11 @@ const log = createLogger('Skills');
 const BRAIN_KEY_SKILLS = 'qasid-skills';
 const FOUNDER_HANDLE = 'lisantherealone';
 
+/** Max skill proposals per day to avoid spamming the founder */
+const MAX_PROPOSALS_PER_DAY = 3;
+let proposalCount = 0;
+let proposalDate = '';
+
 /** Stable epoch for built-in skills (prevents timestamp reset on every deploy) */
 const BUILT_IN_EPOCH = '2025-02-10T00:00:00.000Z';
 
@@ -257,29 +262,56 @@ export async function discoverSkillFromContent(
     sourceUrl?: string,
 ): Promise<Skill | null> {
     try {
+        // Daily proposal rate limit
+        const today = new Date().toISOString().slice(0, 10);
+        if (proposalDate !== today) {
+            proposalDate = today;
+            proposalCount = 0;
+        }
+        if (proposalCount >= MAX_PROPOSALS_PER_DAY) {
+            log.debug('Daily skill proposal cap reached — skipping');
+            return null;
+        }
+
         const result = await generate({
-            prompt: `You are QasidAI, an autonomous AI CMO. You observed this content and need to decide if you can extract a REUSABLE SKILL from it.
+            prompt: `You are QasidAI, an autonomous AI CMO. You observed some content and must decide if it contains a GENUINELY REUSABLE SKILL that you don't already have.
 
 OBSERVED CONTENT:
 "${content.slice(0, 500)}"
 
-A skill is a pattern, technique, or approach you can apply to your own content. Examples:
-- A specific framing technique for tweets
-- A way to present data that gets engagement
-- A type of call-to-action that works
-- An analysis approach you haven't tried
+YOUR EXISTING SKILLS:
+- Signal Scorecard Image (generate branded scorecard images)
+- Multi-Tweet Thread (write 3-5 tweet threads)
+- Trending Reply (sharp replies to trending tweets)
+- Market Regime Commentary (interpret market regime data)
+- Anti-Slop Quality Gate (filter AI-sounding phrases)
 
-Is there a skill worth learning here? If YES, respond:
+STRICT CRITERIA — a valid skill must pass ALL of these:
+1. It's a CONCRETE, REPEATABLE technique (not just a topic or opinion)
+2. It's CLEARLY DIFFERENT from every skill you already have
+3. You can write a SPECIFIC prompt template to execute it
+4. It would MEANINGFULLY improve your content, analysis, or engagement
+5. It's NOT just a vague marketing buzzword ("engagement hack", "viral strategy")
+
+REJECT if:
+- The content is casual conversation, a question, or a joke
+- It describes something you already know how to do
+- It's too vague to turn into a concrete prompt (e.g. "be more authentic")
+- It's about a tool/API you can't actually access
+
+DEFAULT ANSWER: NONE (most content does NOT contain a learnable skill)
+
+If a genuine skill exists, respond:
 SKILL_ID: (short slug, e.g. "contrarian-hook")
 NAME: (human readable name)
-DESCRIPTION: (what this skill does)
+DESCRIPTION: (what this skill does — be specific)
 CATEGORY: (content | analysis | engagement | technical | knowledge | meta)
 PROMPT: (a prompt template to use this skill)
 CONFIDENCE: (0.0-1.0 how useful you think this is)
 
-If NO, respond: NONE`,
+Otherwise respond: NONE`,
             maxTokens: 300,
-            temperature: 0.7,
+            temperature: 0.5,  // Lower temp = more selective
         });
 
         const text = result.content.trim();
@@ -300,10 +332,21 @@ If NO, respond: NONE`,
 
         if (!id || !name || !prompt) return null;
 
-        // Check if we already have this skill
+        // Check if we already have this skill (exact id match)
         if (skillRegistry.some(s => s.id === id)) {
             log.info(`Skill already exists: ${id}`);
             return null;
+        }
+
+        // Fuzzy name dedup: reject if any existing skill shares 3+ words
+        const proposedWords = new Set(name.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+        for (const existing of skillRegistry) {
+            const existingWords = existing.name.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+            const overlap = existingWords.filter(w => proposedWords.has(w)).length;
+            if (overlap >= 3) {
+                log.info(`Skill too similar to "${existing.name}": ${name}`);
+                return null;
+            }
         }
 
         const skill: Skill = {
@@ -326,6 +369,7 @@ If NO, respond: NONE`,
 
         // Post to X asking founder for approval (uses 1 discretionary action)
         await requestSkillApproval(skill);
+        proposalCount++;
 
         return skill;
     } catch (error) {

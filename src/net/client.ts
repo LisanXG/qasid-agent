@@ -94,6 +94,9 @@ const STORAGE_ABI = [
     },
 ] as const;
 
+// TODO: Replace 'any' with proper viem types once writeContract calls are updated
+// to explicitly pass 'account'. Currently, the wallet client injects account at
+// runtime but viem's strict types require it in each call's params.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let publicClient: any = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -181,6 +184,7 @@ export async function writeStorage(key: string, text: string, data: string): Pro
         maxRetries: 3,
         baseDelayMs: 2000,
         label: `Net Storage write (${key})`,
+        circuitBreakerKey: 'net-storage',
     });
 }
 
@@ -308,5 +312,6 @@ export async function postToFeed(text: string, topic: string, data?: string): Pr
         maxRetries: 3,
         baseDelayMs: 2000,
         label: `Botchan post (${topic})`,
+        circuitBreakerKey: 'net-botchan',
     });
 }

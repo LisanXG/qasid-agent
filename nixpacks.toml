@@ -1,0 +1,4 @@
+# Railway build config — Nixpacks
+# Installs fontconfig + monospace fonts for scorecard image generation (sharp SVG→PNG)
+[phases.setup]
+aptPkgs = ["fontconfig", "fonts-dejavu-core"]

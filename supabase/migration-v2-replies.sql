@@ -89,27 +89,6 @@ CREATE POLICY "Service role only" ON qasid_daily_actions FOR ALL
   USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
 -- ============================================================================
--- Follows: Smart follow tracking (who QasidAI has followed + reason)
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS qasid_follows (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  target_user_id TEXT NOT NULL,
-  target_username TEXT,
-  source TEXT NOT NULL,          -- 'mention', 'reply', 'scanner', 'manual'
-  reason TEXT,
-  followed_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_qasid_follows_user ON qasid_follows(target_user_id);
-CREATE INDEX IF NOT EXISTS idx_qasid_follows_date ON qasid_follows(followed_at DESC);
-
-ALTER TABLE qasid_follows ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Service role only" ON qasid_follows FOR ALL
-  USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
-
--- ============================================================================
 -- Skills: QasidAI's learned capabilities and patterns
 -- ============================================================================
 

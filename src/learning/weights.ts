@@ -37,6 +37,7 @@ const defaultWeights: StrategyWeights = {
 
 /**
  * Load current strategy weights from Supabase.
+ * If no weights exist, seed defaults into the DB so adaptations can persist.
  */
 export async function loadWeights(): Promise<StrategyWeights> {
     const { data, error } = await supabase
@@ -46,8 +47,10 @@ export async function loadWeights(): Promise<StrategyWeights> {
         .single();
 
     if (error || !data) {
-        log.info('No existing weights found, using defaults');
-        return { ...defaultWeights };
+        log.info('No existing weights found — seeding defaults to DB');
+        const seeded = { ...defaultWeights };
+        await saveWeights(seeded);
+        return seeded;
     }
 
     return {

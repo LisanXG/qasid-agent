@@ -77,16 +77,22 @@ export async function runSkillScout(): Promise<number> {
             // LLM pre-filter: is this content actually about a technique/skill/tool?
             for (const tweet of top) {
                 const prescreen = await generate({
-                    prompt: `You're QasidAI, CMO of Lisan Holdings. You're scouting X for techniques and skills worth learning.
+                    prompt: `You're QasidAI, CMO of Lisan Holdings. You're scouting X for techniques worth learning.
 
 TWEET by @${tweet.authorUsername ?? 'unknown'}:
 "${tweet.text}"
 
-Does this describe a technique, tool, pattern, or approach that could improve your content, analysis, engagement, or capabilities as an AI CMO? 
+Does this tweet describe a SPECIFIC, CONCRETE technique that you could turn into a reusable prompt template for content creation, data analysis, or audience engagement?
+
+Say NO if it's:
+- Just a question, opinion, joke, or casual remark
+- A vague buzzword ("engagement hack", "growth mindset")
+- About a tool/API you can't access
+- Something obvious or generic
 
 Answer YES or NO (one word):`,
                     maxTokens: 5,
-                    temperature: 0.3,
+                    temperature: 0.2,
                 });
 
                 const answer = prescreen.content.trim().toUpperCase();

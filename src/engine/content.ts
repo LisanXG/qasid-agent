@@ -190,6 +190,28 @@ export async function generatePost(
     // Sanitize LLM output
     let content = sanitizeContent(result.content);
 
+    // Minimum content length gate — reject garbage like "No", "OK", etc.
+    const MIN_CONTENT_LENGTH = 20;
+    let lengthRetries = 0;
+    while (content.length < MIN_CONTENT_LENGTH && lengthRetries < 2) {
+        lengthRetries++;
+        log.warn(`Content too short (${content.length} chars) — regenerating (attempt ${lengthRetries + 1})`);
+        const retry = await generate({
+            prompt: prompt + '\n\nIMPORTANT: Your previous output was too short. Write a full, complete tweet.',
+            strategyContext: options?.strategyContext,
+            timeContext,
+            maxTokens: 150,
+            temperature: Math.min(1.0, 0.9 + lengthRetries * 0.05),
+        });
+        content = sanitizeContent(retry.content);
+        result.inputTokens += retry.inputTokens;
+        result.outputTokens += retry.outputTokens;
+    }
+    if (content.length < MIN_CONTENT_LENGTH) {
+        log.error(`Content still too short after ${lengthRetries} retries (${content.length} chars) — skipping post`);
+        throw new Error(`Generated content too short: ${content.length} chars`);
+    }
+
     // Anti-slop retry: if banned phrase detected, regenerate (up to 2 retries)
     let slopPhrase = detectSlop(content);
     let retries = 0;

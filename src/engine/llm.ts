@@ -77,6 +77,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
         baseDelayMs: 1000,
         skipClientErrors: true,
         label: 'LLM generation',
+        circuitBreakerKey: 'anthropic',
     });
 }
 

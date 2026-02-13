@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { runFounderMentionCheck } from '../engine/mention-monitor.js';
 import { generatePost } from '../engine/content.js';
 import { savePost, wasRecentlyPosted } from '../engine/memory.js';
+import { runBotchanReplyMonitor } from '../net/botchan-replies.js';
 import { postTweet, postTweetWithImage } from '../platforms/x.js';
 import { isXConfigured, isNetConfigured } from '../config.js';
 import { createLogger } from '../logger.js';
@@ -481,7 +482,24 @@ export function startScheduler(): void {
     activeTasks.push(skillScoutPM);
     log.info('🔍 Skill scout active (2x/day: 10:00 & 22:00 UTC)');
 
-    log.info(`Scheduler started with ${activeTasks.length} cron jobs (13 posts/day + founder monitor + skill scout)`);
+    // ---- Botchan Reply Monitor (every 30 min) ----
+    if (isNetConfigured) {
+        const botchanReplies = cron.schedule('*/30 * * * *', async () => {
+            log.debug('📨 Botchan reply monitor running...');
+            try {
+                const replied = await runBotchanReplyMonitor();
+                if (replied > 0) {
+                    log.info(`📨 Botchan reply monitor: sent ${replied} reply(ies)`);
+                }
+            } catch (error) {
+                log.error('Botchan reply monitor failed', { error: String(error) });
+            }
+        }, { timezone: 'UTC' });
+        activeTasks.push(botchanReplies);
+        log.info('📨 Botchan reply monitor active (every 30 min)');
+    }
+
+    log.info(`Scheduler started with ${activeTasks.length} cron jobs (13 posts/day + founder monitor + skill scout + botchan replies)`);
 }
 
 /**
