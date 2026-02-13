@@ -3,7 +3,7 @@ import { getMentions, replyToTweet, getTweetById, type MentionTweet } from '../p
 import { gatherIntelContext } from '../data/intelligence.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
-import { processSkillApproval } from '../skills/skill-manager.js';
+import { processSkillApproval, discoverSkillFromContent } from '../skills/skill-manager.js';
 
 // ============================================================================
 // QasidAI — Mention & Reply Monitor
@@ -464,6 +464,20 @@ export async function runFounderMentionCheck(): Promise<number> {
                 targetMention: mention.id,
                 reply: replyText.slice(0, 80),
             });
+
+            // After replying, evaluate if this content contains a learnable skill
+            // The LLM will return null for casual questions/chats — only proposes
+            // skills when it genuinely identifies a reusable pattern
+            const skillContent = parentTweet
+                ? `${mention.text}\n\nOriginal post by @${parentTweet.authorUsername}: ${parentTweet.text}`
+                : mention.text;
+            const discovered = await discoverSkillFromContent(skillContent, 'founder_tag');
+            if (discovered) {
+                log.info('🧠 Skill discovered from founder tag', {
+                    skill: discovered.name,
+                    category: discovered.category,
+                });
+            }
         }
     }
 

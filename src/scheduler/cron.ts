@@ -19,6 +19,7 @@ import { recordAction } from '../engine/daily-budget.js';
 import { generateScorecardImage } from '../engine/scorecard-image.js';
 import { runBotchanContentCycle } from '../net/botchan-content.js';
 import { initializeSkills, syncSkillsToChain } from '../skills/skill-manager.js';
+import { runSkillScout } from '../skills/skill-scout.js';
 
 // ============================================================================
 // QasidAI — Content Scheduler
@@ -419,7 +420,31 @@ export function startScheduler(): void {
     activeTasks.push(founderMentions);
     log.info('👑 Founder VIP mention monitor active (every 15 min)');
 
-    log.info(`Scheduler started with ${activeTasks.length} cron jobs (13 posts/day + founder mention monitor)`);
+    // ---- Skill Scout (2x/day: 10:00 and 22:00 UTC) ----
+    const skillScoutAM = cron.schedule('0 10 * * *', async () => {
+        log.info('🔍 Skill scout (AM) starting...');
+        try {
+            const proposed = await runSkillScout();
+            log.info(`🔍 Skill scout (AM): ${proposed} skill(s) proposed`);
+        } catch (error) {
+            log.error('Skill scout (AM) failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(skillScoutAM);
+
+    const skillScoutPM = cron.schedule('0 22 * * *', async () => {
+        log.info('🔍 Skill scout (PM) starting...');
+        try {
+            const proposed = await runSkillScout();
+            log.info(`🔍 Skill scout (PM): ${proposed} skill(s) proposed`);
+        } catch (error) {
+            log.error('Skill scout (PM) failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(skillScoutPM);
+    log.info('🔍 Skill scout active (2x/day: 10:00 & 22:00 UTC)');
+
+    log.info(`Scheduler started with ${activeTasks.length} cron jobs (13 posts/day + founder monitor + skill scout)`);
 }
 
 /**

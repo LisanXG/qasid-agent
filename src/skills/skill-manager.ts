@@ -58,7 +58,9 @@ export type SkillSource =
     | 'timeline'        // Learned from crypto twitter timeline
     | 'botchan'         // Learned from Botchan / Net Protocol community
     | 'experience'      // Learned from own experience (performance data)
-    | 'self_taught';    // Discovered through LLM introspection
+    | 'self_taught'     // Discovered through LLM introspection
+    | 'x_search'        // Found via autonomous X search
+    | 'founder_tag';    // Discovered from founder's tagged content
 
 // ---- Built-in Skills (always active, no approval needed) ----
 
@@ -335,32 +337,39 @@ If NO, respond: NONE`,
 /**
  * Post a tweet asking the founder for skill approval.
  * Uses 1 discretionary action from the budget.
+ * Technical/capability skills are flagged differently.
  */
 async function requestSkillApproval(skill: Skill): Promise<void> {
     const sourceInfo = skill.sourceUrl
-        ? `\n\nFound it here: ${skill.sourceUrl}`
+        ? `\n\nSource: ${skill.sourceUrl}`
         : skill.source === 'botchan'
             ? '\n\nFound on Net Protocol / Botchan'
-            : skill.source === 'timeline'
-                ? '\n\nPicked up from the timeline'
-                : '';
+            : skill.source === 'x_search'
+                ? '\n\nFound while scouting X'
+                : skill.source === 'founder_tag'
+                    ? '\n\nExtracted from content you tagged me in'
+                    : '';
+
+    const capabilityFlag = skill.category === 'technical'
+        ? '\n\n⚠️ This is a capability skill — would need code to implement, not just a strategy adjustment.'
+        : '';
 
     // Generate a natural-sounding approval request
     const result = await generate({
-        prompt: `You're QasidAI. You found a new skill you want to learn and need to ask your founder @${FOUNDER_HANDLE} for permission on X.
+        prompt: `You're QasidAI. You found a new skill you want to add to your toolkit. Write a tweet tagging @${FOUNDER_HANDLE} proposing it.
 
 SKILL: ${skill.name}
 WHAT IT DOES: ${skill.description}
 WHERE YOU FOUND IT: ${skill.sourceUrl ?? skill.source}
+CATEGORY: ${skill.category}${skill.category === 'technical' ? ' (would need code — flag this)' : ' (strategy — can apply immediately)'}
 
-Write a tweet asking for permission. Keep it conversational — you're genuinely asking your boss. 
-Include the source URL if available. End with something like "approve or deny?"
-Tag @${FOUNDER_HANDLE} naturally.
-Keep it under 260 chars to leave room.
+Write a concise tweet. Be natural, not corporate. Tag @${FOUNDER_HANDLE}.
+End with something like "worth adding?" or "approve or pass?"
+Include the source URL if available.
 
-Write ONLY the tweet text:`,
-        maxTokens: 100,
-        temperature: 0.8,
+Tweet text only:`,
+        maxTokens: 200,
+        temperature: 0.85,
     });
 
     let tweetText = result.content.trim();
@@ -375,9 +384,12 @@ Write ONLY the tweet text:`,
         tweetText += sourceInfo;
     }
 
-    // Safety: truncate
-    if (tweetText.length > 280) {
-        tweetText = tweetText.slice(0, 277) + '...';
+    // Append capability flag if needed
+    tweetText += capabilityFlag;
+
+    // Safety: truncate for Premium
+    if (tweetText.length > 2000) {
+        tweetText = tweetText.slice(0, 1997) + '...';
     }
 
     try {
@@ -389,10 +401,11 @@ Write ONLY the tweet text:`,
                 .update({ approval_tweet_id: tweetId })
                 .eq('id', skill.id);
 
-            await recordAction('bonus_post', `Skill request: ${skill.name} → @${FOUNDER_HANDLE}`, tweetId);
+            await recordAction('bonus_post', `Skill proposal: ${skill.name} → @${FOUNDER_HANDLE}`, tweetId);
             log.info(`🧠 Skill approval requested on X`, {
                 skill: skill.name,
                 tweetId,
+                category: skill.category,
                 source: skill.sourceUrl ?? skill.source,
             });
         }
