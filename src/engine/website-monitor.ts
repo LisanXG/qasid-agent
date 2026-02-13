@@ -4,6 +4,7 @@ import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
 import { createHash } from 'node:crypto';
 import { withRetry } from '../retry.js';
+import { sanitizeUserInput } from './sanitize-input.js';
 
 // ============================================================================
 // QasidAI — Website Monitor
@@ -101,10 +102,10 @@ async function checkPage(url: string, label: string): Promise<number> {
 WEBSITE: ${label} (${url})
 
 PREVIOUS CONTENT (summary):
-${oldText.slice(0, 1500)}
+${sanitizeUserInput(oldText.slice(0, 1500), 1500)}
 
 CURRENT CONTENT (summary):
-${newText.slice(0, 1500)}
+${sanitizeUserInput(newText.slice(0, 1500), 1500)}
 
 What's NEW or CHANGED? Extract specific factual updates about products, features, numbers, or company information.
 

@@ -4,6 +4,7 @@ import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
 import { createHash } from 'node:crypto';
 import { withRetry } from '../retry.js';
+import { sanitizeUserInput } from './sanitize-input.js';
 
 // ============================================================================
 // QasidAI — GitHub Organization Monitor
@@ -118,7 +119,7 @@ URL: ${repo.html_url}
 TOPICS: ${repo.topics?.join(', ') || 'none'}
 
 README CONTENT:
-${readme.slice(0, 2000)}
+${sanitizeUserInput(readme.slice(0, 2000), 2000)}
 
 ${isNew
                     ? 'This is a NEW repository. Extract the key facts about what this repo is, what it does, and why it matters for Lisan Holdings.'

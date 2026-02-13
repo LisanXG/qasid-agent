@@ -3,6 +3,7 @@ import { addKnowledge } from './dynamic-knowledge.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
 import { withRetry } from '../retry.js';
+import { sanitizeUserInput } from './sanitize-input.js';
 
 // ============================================================================
 // QasidAI — Founder Tweet Monitor
@@ -115,11 +116,12 @@ async function getNewFounderTweets(): Promise<{ id: string; text: string }[]> {
  * Returns null if the tweet doesn't contain extractable facts.
  */
 async function extractFactsFromTweet(tweetText: string): Promise<string[] | null> {
+    const sanitized = sanitizeUserInput(tweetText, 1000);
     const result = await withRetry(async () => {
         return generate({
             prompt: `You are QasidAI, autonomous CMO of Lisan Holdings. Your founder @Lisantherealone just tweeted this:
 
-"${tweetText}"
+"${sanitized}"
 
 Extract any FACTUAL INFORMATION that would be useful for you as CMO. This could be:
 - Product updates, new features, or changes

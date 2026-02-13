@@ -497,7 +497,7 @@ export async function runFounderMentionCheck(): Promise<number> {
         );
         if (instructionMatch) {
             const command = instructionMatch[1].toLowerCase() as 'remember' | 'update' | 'forget';
-            const payload = instructionMatch[2].trim();
+            const payload = sanitizeUserInput(instructionMatch[2].trim(), 500);
 
             let ack: string;
             if (command === 'forget') {

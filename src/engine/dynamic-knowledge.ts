@@ -106,11 +106,13 @@ export async function deactivateFact(id: string): Promise<boolean> {
  * Returns count of deactivated facts.
  */
 export async function deactivateByKeyword(keyword: string): Promise<number> {
+    // Escape SQL wildcard characters to prevent matching all facts
+    const escaped = keyword.replace(/[%_]/g, '\\$&');
     const { data, error } = await supabase
         .from('qasid_knowledge')
         .select('id, fact')
         .eq('active', true)
-        .ilike('fact', `%${keyword}%`);
+        .ilike('fact', `%${escaped}%`);
 
     if (error || !data || data.length === 0) return 0;
 
