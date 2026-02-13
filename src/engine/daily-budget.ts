@@ -4,7 +4,7 @@ import { createLogger } from '../logger.js';
 // ============================================================================
 // QasidAI — Daily Action Budget
 // Tracks daily post/action budget: 45 total = 30 X + 15 Botchan
-// X budget: 13 scheduled + 17 discretionary
+// X budget: 10 scheduled + 20 discretionary
 // ============================================================================
 
 const log = createLogger('Budget');
@@ -25,7 +25,7 @@ export const X_BUDGET = 30;
 export const BOTCHAN_BUDGET = 15;
 
 export type ActionType =
-    | 'scheduled_post'     // One of the 13 cron-driven X posts
+    | 'scheduled_post'     // One of the 10 cron-driven X posts
     | 'reply'              // Reply to a trending/relevant tweet
     | 'mention_response'   // Respond to someone who @mentioned us
     | 'thread'             // Multi-tweet thread on a topic

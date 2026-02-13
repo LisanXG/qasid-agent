@@ -283,12 +283,15 @@ export async function gatherIntelContext(): Promise<string> {
     }
 
     // Active signals from engine
+    // ⚠️ CRITICAL: These are CURRENT/OPEN positions — NOT completed trades.
+    // The LLM must never treat active signals as "wins" or "completed trades".
     if (engineData?.signals?.length) {
         const activeSignals = engineData.signals.filter(s => s.direction !== 'HOLD');
         const holdSignals = engineData.signals.filter(s => s.direction === 'HOLD');
 
         if (activeSignals.length > 0) {
-            parts.push(`## Active Signals (${activeSignals.length} directional, ${holdSignals.length} hold)
+            parts.push(`## Active Signals — CURRENT POSITIONS (NOT completed trades)
+⚠️ These are LIVE entry signals showing the engine's current stance. They have NOT been resolved yet — no win/loss outcome exists for these. Do NOT describe these as "wins" or "consecutive wins". They are open positions.
 ${activeSignals.slice(0, 8).map(s => {
                 const breakdownStr = `M:${s.breakdown.momentum.score.toFixed(0)}/${s.breakdown.momentum.max} T:${s.breakdown.trend.score.toFixed(0)}/${s.breakdown.trend.max} V:${s.breakdown.volume.score.toFixed(0)}/${s.breakdown.volume.max}`;
                 return `- ${s.coin} (${s.name}): ${s.direction} @ $${s.entryPrice} | Score: ${s.score}/100 | R:R ${s.riskRewardRatio} | ${breakdownStr}`;
@@ -296,10 +299,12 @@ ${activeSignals.slice(0, 8).map(s => {
         }
     }
 
-    // Recent outcomes (wins and losses)
+    // Recent COMPLETED outcomes (wins and losses) — from /proof page
+    // These ARE resolved trades with actual P&L. Only THESE can be called "wins" or "losses".
     if (proofData?.recentOutcomes?.length) {
         const recent = proofData.recentOutcomes.slice(0, 5);
-        parts.push(`## Recent Trade Outcomes
+        parts.push(`## Recent COMPLETED Trade Outcomes (from /proof — these ARE resolved)
+These trades have ACTUALLY closed with a result. Only reference these when discussing wins, losses, or streaks.
 ${recent.map(o => `- ${o.coin} ${o.direction}: ${o.outcome} (${o.profit_pct > 0 ? '+' : ''}${o.profit_pct.toFixed(1)}%) via ${o.exit_reason}`).join('\n')}`);
     }
 

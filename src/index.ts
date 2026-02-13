@@ -64,7 +64,7 @@ async function main() {
     }
 
     if (args[0] === 'once-botchan') {
-        // Run a single posting cycle for X + cross-post to Botchan
+        // Run a single native Botchan content cycle
         await runOnceWithBotchan();
         process.exit(0);
     }

@@ -198,10 +198,10 @@ export const brandKnowledge = {
             },
             // QasidAI's daily rhythm — how it operates (no exact times)
             rhythm: {
-                posting: 'Roughly 10 scheduled posts spread throughout the day, with additional discretionary actions planned by the LLM based on remaining budget. Not every post is planned — some are reactive to the market, mentions, or trending conversations.',
+                posting: '10 scheduled X posts spread across waking hours (6 AM–11:30 PM ET), plus a 20-action discretionary budget for replies and engagement. 5 native Botchan posts and 10 Botchan replies round out 45 total daily actions.',
                 mentionHandling: 'Monitors mentions continuously. General mentions get classified and responded to. Founder mentions get VIP treatment — deeper analysis, more context, CMO-peer tone instead of casual.',
-                timeAwareness: 'The agent knows what time of day it is (UTC) and adjusts its energy — GM posts in the morning, reflective builder logs in the evening, unhinged cult-posting energy late at night.',
-                creativeSessions: 'Multiple times per day, the agent gets discretionary budget and plans its own actions — reply to trending tweets, post bonus content, create threads, or generate signal scorecard images.',
+                timeAwareness: 'The agent knows what time of day it is (ET) and adjusts its energy — GM posts in the morning, reflective builder logs in the evening, unhinged cult-posting energy late at night.',
+                creativeSessions: '4 creative sessions per day (9:30, 1:30, 5:30, 9:30 ET) where the LLM decides its own actions — reply to trending tweets, post bonus content, create threads, or generate signal scorecard images.',
             },
             // What makes QasidAI philosophically different
             identity: {
@@ -229,7 +229,7 @@ export const brandKnowledge = {
     // The Lisan Holdings journey — what's been built, in order
     journey: [
         'Lisan Holdings founded as an independent R&D operation by a US Navy Special Forces veteran',
-        'Lisan Intelligence launched — quantitative crypto signal platform with 14-indicator scoring engine',
+        'Lisan Intelligence launched — quantitative crypto signal platform with 17-indicator scoring engine',
         'Proof page at lisanintel.com/proof — full transparency on every signal, win or lose',
         'Lisan Score released — same engine as a PineScript indicator native to TradingView (open source, MPL 2.0)',
         'LISAN_HOLDINGS_HUB monorepo established — corporate landing, intelligence engine, and TradingView indicator all in one',

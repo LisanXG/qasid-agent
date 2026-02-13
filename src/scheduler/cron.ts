@@ -108,7 +108,7 @@ async function runContentCycle(options?: {
 /**
  * Start the content scheduler.
  * 10 content posts/day spread across waking hours (US Eastern):
- * - 06:00 🌅 GM post (+ Botchan cross-post)
+ * - 06:00 🌅 GM post
  * - 08:00 📊 Market/signal data
  * - 10:00 🧱 Builder narrative / founder journey
  * - 12:00 💡 Educational / methodology

@@ -49,18 +49,22 @@ const DATA_TYPES: ContentType[] = [
 ];
 
 /**
- * Get a human-readable time context string for the current UTC hour.
+ * Get a human-readable time context string for the current US Eastern hour.
+ * All cron jobs fire on America/New_York — this must match.
  */
 export function getTimeContext(): string {
-    const hour = new Date().getUTCHours();
+    const etHour = parseInt(
+        new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/New_York' }).format(new Date()),
+        10,
+    );
 
-    if (hour >= 5 && hour < 9) return `It's early morning (${hour}:00 UTC). GM energy — start the day with a greeting and a real take. Keep it warm but don't be corny.`;
-    if (hour >= 9 && hour < 12) return `It's mid-morning (${hour}:00 UTC). Markets are active. Good time for data, signals, and market observations.`;
-    if (hour >= 12 && hour < 15) return `It's midday (${hour}:00 UTC). Peak engagement hours. Education, product highlights, or a hot take.`;
-    if (hour >= 15 && hour < 18) return `It's afternoon (${hour}:00 UTC). Good time for engagement — questions, challenges, or witty observations.`;
-    if (hour >= 18 && hour < 21) return `It's evening (${hour}:00 UTC). Reflective energy. Builder stories, journey recaps, or meta-commentary about being an AI.`;
-    if (hour >= 21 && hour < 24) return `It's late night (${hour}:00 UTC). Unhinged posting hours. Hot takes, cult vibes, schizo founder energy. Go wild but stay sharp.`;
-    return `It's late night / early morning (${hour}:00 UTC). Quiet hours. Philosophical, reflective, or just a vibe post.`;
+    if (etHour >= 5 && etHour < 9) return `It's early morning (${etHour}:00 ET). GM energy — start the day with a greeting and a real take. Keep it warm but don't be corny.`;
+    if (etHour >= 9 && etHour < 12) return `It's mid-morning (${etHour}:00 ET). Markets are active. Good time for data, signals, and market observations.`;
+    if (etHour >= 12 && etHour < 15) return `It's midday (${etHour}:00 ET). Peak engagement hours. Education, product highlights, or a hot take.`;
+    if (etHour >= 15 && etHour < 18) return `It's afternoon (${etHour}:00 ET). Good time for engagement — questions, challenges, or witty observations.`;
+    if (etHour >= 18 && etHour < 21) return `It's evening (${etHour}:00 ET). Reflective energy. Builder stories, journey recaps, or meta-commentary about being an AI.`;
+    if (etHour >= 21 && etHour < 24) return `It's late night (${etHour}:00 ET). Unhinged posting hours. Hot takes, cult vibes, schizo founder energy. Go wild but stay sharp.`;
+    return `It's late night / early morning (${etHour}:00 ET). Quiet hours. Philosophical, reflective, or just a vibe post.`;
 }
 
 /**
@@ -115,6 +119,7 @@ BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "
             educational: 'Teach something about how signals work, what indicators mean, or why quantitative approaches matter. Be a teacher, not a salesman.',
             cross_platform: 'Drive people between platforms — X, Botchan, lisanholdings.dev — but naturally, not as a CTA.',
             countdown_tease: 'Tease something upcoming. Build anticipation without revealing everything.',
+            win_streak: 'Celebrate a streak of COMPLETED trade wins from the /proof page. CRITICAL: Only reference trades that have actually CLOSED with a WIN outcome in the "Recent COMPLETED Trade Outcomes" data. NEVER count active/open signals as wins — those have not resolved yet. If no completed wins are available, talk about methodology and transparency instead.',
         };
         const hint = topicHints[contentType];
         if (hint) {
