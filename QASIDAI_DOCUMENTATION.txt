@@ -1,0 +1,1464 @@
+================================================================================
+  QASIDAI — COMPREHENSIVE DOCUMENTATION
+  Autonomous AI CMO for Lisan Holdings
+  Generated: February 2026
+================================================================================
+
+TABLE OF CONTENTS
+─────────────────
+  1.  PROJECT OVERVIEW
+  2.  ARCHITECTURE & PROJECT STRUCTURE
+  3.  CONFIGURATION & ENVIRONMENT VARIABLES
+  4.  CORE ENGINE
+      4.1  Entry Point (index.ts)
+      4.2  Content Generation (content.ts)
+      4.3  LLM Integration (llm.ts)
+      4.4  Memory System (memory.ts)
+      4.5  Daily Budget System (daily-budget.ts)
+      4.6  Creative Sessions (creative-session.ts)
+      4.7  Mention Monitor (mention-monitor.ts)
+      4.8  Timeline Scanner (timeline-scanner.ts)
+      4.9  Smart Follow Engine (smart-follow.ts)
+      4.10 Scorecard Image Generator (scorecard-image.ts)
+      4.11 Input Sanitization (sanitize-input.ts)
+  5.  LEARNING ENGINE
+      5.1  Strategy Weights (weights.ts)
+      5.2  Post Scorer (scorer.ts)
+      5.3  Engagement Pipeline (engagement.ts)
+      5.4  Performance Tracker (tracker.ts)
+      5.5  Meta Review (meta-review.ts)
+  6.  NET PROTOCOL INTEGRATION (ON-CHAIN BRAIN)
+      6.1  Client (client.ts)
+      6.2  Brain Manager (brain.ts)
+      6.3  Botchan Content (botchan-content.ts)
+      6.4  Botchan Replies (botchan-replies.ts)
+      6.5  Daily Summary (daily-summary.ts)
+  7.  PERSONALITY SYSTEM
+      7.1  System Prompt (system-prompt.ts)
+      7.2  Brand Knowledge (brand-knowledge.ts)
+  8.  X (TWITTER) PLATFORM INTEGRATION (x.ts)
+  9.  SKILLS SYSTEM
+      9.1  Skill Manager (skill-manager.ts)
+      9.2  Skill Scout (skill-scout.ts)
+  10. DATA & INTELLIGENCE
+      10.1 LISAN Intelligence Client (intelligence.ts)
+      10.2 Market Data (market.ts)
+  11. UTILITIES
+      11.1 Logger (logger.ts)
+      11.2 Retry with Circuit Breaker (retry.ts)
+      11.3 Supabase Client (supabase.ts)
+  12. DATABASE (SUPABASE)
+  13. CRON SCHEDULE — FULL BREAKDOWN
+  14. SECURITY NOTES
+  15. DEPLOYMENT & MAINTENANCE
+
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+QasidAI is an autonomous AI marketing agent (CMO) built for Lisan Holdings.
+It operates across X (Twitter) and the Net Protocol Botchan feed, generating
+content, responding to mentions, scanning timelines, learning from engagement
+data, and evolving its strategy over time — all autonomously.
+
+Key characteristics:
+  • Language/Runtime: TypeScript, Node.js (ES Modules)
+  • LLM:             Anthropic Claude 3.5 Haiku (via @anthropic-ai/sdk)
+  • Database:         Supabase (PostgreSQL)
+  • On-Chain Brain:  Net Protocol on Base L2 (via Botchan SDK + viem)
+  • Platform:         X (Twitter) via twitter-api-v2
+  • Image Gen:       SVG → PNG via Sharp library
+  • Deployment:      Railway (auto-deploy from GitHub main branch)
+  • Budget:          45 actions/day (30 X + 15 Botchan)
+  • Learning:        Self-adapting strategy weights across 4 dimensions
+
+Repository: github.com/LisanXG/qasid-agent
+
+
+================================================================================
+2. ARCHITECTURE & PROJECT STRUCTURE
+================================================================================
+
+qasid/
+├── src/
+│   ├── index.ts                 # Entry point, CLI commands, main loop
+│   ├── config.ts                # Zod-validated environment variables
+│   ├── logger.ts                # Structured logger with levels
+│   ├── retry.ts                 # Exponential backoff + circuit breaker
+│   ├── supabase.ts              # Shared Supabase client (service role)
+│   │
+│   ├── engine/                  # Core content & interaction logic
+│   │   ├── content.ts           # Content generation pipeline
+│   │   ├── llm.ts               # Claude API wrapper
+│   │   ├── memory.ts            # Post history & dedup
+│   │   ├── daily-budget.ts      # Daily action budget tracking
+│   │   ├── creative-session.ts  # LLM-planned discretionary actions
+│   │   ├── mention-monitor.ts   # @mention & founder VIP monitoring
+│   │   ├── timeline-scanner.ts  # Proactive timeline reply engine
+│   │   ├── smart-follow.ts      # Strategic follow engine
+│   │   ├── scorecard-image.ts   # Signal scorecard PNG generator
+│   │   ├── sanitize-input.ts    # Prompt injection defense
+│   │   ├── dynamic-knowledge.ts # Runtime-learned fact storage
+│   │   ├── founder-monitor.ts   # Founder tweet ingestion
+│   │   ├── website-monitor.ts   # Website change detection
+│   │   └── github-monitor.ts    # GitHub org change detection
+│   │
+│   ├── learning/                # Self-learning engine
+│   │   ├── weights.ts           # 4-dimension strategy weight manager
+│   │   ├── scorer.ts            # Post performance scorer (v2)
+│   │   ├── engagement.ts        # X API metrics fetcher
+│   │   ├── tracker.ts           # Supabase metric updater
+│   │   └── meta-review.ts       # Weekly trend analysis
+│   │
+│   ├── net/                     # Net Protocol on-chain brain
+│   │   ├── client.ts            # Net Protocol SDK wrapper
+│   │   ├── brain.ts             # Brain upload/download manager
+│   │   ├── botchan-content.ts   # Botchan native content generator
+│   │   ├── botchan-replies.ts   # Botchan reply monitor
+│   │   └── daily-summary.ts     # End-of-day on-chain digest
+│   │
+│   ├── personality/             # Identity & voice
+│   │   ├── system-prompt.ts     # System prompt builder
+│   │   └── brand-knowledge.ts   # Lisan Holdings knowledge base
+│   │
+│   ├── platforms/               # External platform connectors
+│   │   └── x.ts                 # X (Twitter) API v2 connector
+│   │
+│   ├── skills/                  # Autonomous skill system
+│   │   ├── skill-manager.ts     # Skill registry & approval flow
+│   │   └── skill-scout.ts       # X search-based skill discovery
+│   │
+│   ├── data/                    # External data sources
+│   │   ├── intelligence.ts      # LISAN Intelligence API client
+│   │   └── market.ts            # CoinGecko trending data
+│   │
+│   └── tests/                   # Test files
+│
+├── supabase/
+│   └── migrations/              # SQL migration files
+│       ├── migration.sql
+│       ├── migration-v2-replies.sql
+│       ├── migration-update.sql
+│       └── migration-v3-knowledge.sql
+│
+├── tools/                       # Utility scripts
+│   └── net-profile-canvas.html  # Profile image generator
+│
+├── .env                         # Environment variables (gitignored)
+├── .env.example                 # Template for environment setup
+├── package.json                 # Dependencies & scripts
+├── tsconfig.json                # TypeScript configuration
+└── WHITEPAPER.md                # QasidAI whitepaper
+
+
+================================================================================
+3. CONFIGURATION & ENVIRONMENT VARIABLES
+================================================================================
+
+File: src/config.ts
+
+All configuration is loaded from environment variables and validated at
+startup using Zod schemas. If any required variable is missing or malformed,
+the agent fails fast with a clear error message.
+
+Required Variables:
+───────────────────
+  ANTHROPIC_API_KEY        Anthropic Claude API key
+  SUPABASE_URL             Supabase project URL
+  SUPABASE_SERVICE_ROLE_KEY Supabase service role key (bypasses RLS)
+  X_API_KEY                X (Twitter) API key
+  X_API_SECRET             X API secret
+  X_ACCESS_TOKEN           X OAuth access token
+  X_ACCESS_SECRET          X OAuth access secret
+
+Optional Variables:
+───────────────────
+  LISAN_INTEL_URL          LISAN Intelligence API base URL
+                           Default: https://lisanintel.com
+  NET_PRIVATE_KEY          Ethereum private key for Net Protocol
+                           Must start with 0x, 66 chars total
+  NET_ENABLED              Enable Net Protocol integration
+                           Default: false (set to "true" to enable)
+  POSTING_ENABLED          Master switch for live X posting
+                           Default: false (dry-run mode)
+
+Derived Flags (computed from config):
+  isXConfigured            True if all 4 X API keys are present
+  isNetConfigured          True if NET_PRIVATE_KEY exists and NET_ENABLED=true
+
+Security Note: The .env file is gitignored. The Zod validation ensures the
+NET_PRIVATE_KEY format is exactly 66 characters starting with 0x, preventing
+accidental invalid key configurations.
+
+
+================================================================================
+4. CORE ENGINE
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+4.1 ENTRY POINT — src/index.ts (286 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+The main entry point handles CLI arguments and starts the scheduler.
+
+CLI Commands (run via: npx tsx src/index.ts <command>):
+
+  (no args)         Start the scheduler (production mode)
+  --test            Generate a test post (dry-run, no posting)
+  --once            Generate and post one tweet, then exit
+  --thread          Generate and post a thread
+  --check-x         Run X API capability diagnostics
+  --net-upload      Upload personality + brand knowledge to Net Protocol
+  --net-status      Show Net Protocol connection status
+  --image           Generate and post a signal scorecard image
+  --learn           Run the learning cycle manually
+  --meta-review     Run the weekly meta review manually
+  --timeline        Run one timeline scan cycle
+  knowledge-sync    Run all knowledge monitors (founder, website, GitHub)
+
+Startup Flow:
+  1. Parse CLI arguments
+  2. Load environment config (Zod validation)
+  3. Print platform status report (X, Net, Scheduler, Skills, Intel, LLM)
+  4. Execute the requested command or start the scheduler
+
+When starting the scheduler:
+  - Initializes the skills system (loads from Supabase + built-ins)
+  - Calls startScheduler() to register all cron jobs
+  - Enters an infinite loop (keeps the process alive)
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.2 CONTENT GENERATION — src/engine/content.ts (571 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+The heart of QasidAI's posting capabilities.
+
+Content Types (14 total, weighted by learning engine):
+  • gm_post              Morning greeting / energy setter
+  • signal_scorecard     Live signal data from LISAN Intelligence
+  • win_streak           Highlight consecutive winning signals
+  • market_regime        Market regime commentary
+  • challenge            Interactive challenges for followers
+  • founder_journey      Lisan's builder narrative
+  • builder_narrative    Behind-the-scenes engineering stories
+  • countdown_tease      Product launch teasers
+  • product_spotlight    Feature highlights
+  • educational          Teaching trading/crypto concepts
+  • social_proof         Win rates, proof stats, testimonials
+  • engagement_bait      Polls, questions, hot takes
+  • self_aware           Meta-commentary about being an AI agent
+  • cross_platform       Driving traffic between platforms
+
+Key Functions:
+
+  generatePost(options?)
+    Generates a single X post:
+    1. Picks a content type based on strategy weights (or forced type)
+    2. Fetches context: recent posts, intel data, brand knowledge
+    3. Builds a detailed LLM prompt with time-of-day awareness
+    4. Calls Claude to generate content
+    5. Sanitizes output (security + quality checks)
+    6. Retries up to 3x if content is too long or contains slop
+    7. Adds contextual @-mentions via LLM evaluation
+    8. Infers topic and tone from generated content
+    Returns: { content, contentType, platform, tone, topic, tokens, timestamp }
+
+  generateThread(options?)
+    Generates a multi-tweet thread (3-5 tweets):
+    1. Picks topic based on weights
+    2. Builds thread-specific prompt with thread writing rules
+    3. Parses numbered tweet format from LLM output
+    4. Sanitizes each tweet individually
+    Returns: { tweets[], contentType, topic, tokens }
+
+  sanitizeContent(raw)
+    Critical security + quality filter applied to ALL generated content:
+    - Removes LLM preambles ("Here's a tweet:", "Sure!", etc.)
+    - Strips surrounding quotes
+    - BLOCKS content containing wallet addresses / private key patterns
+    - BLOCKS content with non-allowlisted URLs
+    - URL allowlist: lisanintel.com, lisanholdings.dev, github.com/LisanXG,
+      lisanscore.com, net.app, x.com, twitter.com
+    - Replaces blocked content with safe fallback text
+    Returns: cleaned string or fallback
+
+  addContextualMentions(content)
+    Uses LLM to decide if specific accounts should be @-mentioned:
+    - Evaluates content topics against a curated mention map
+    - Only mentions accounts when contextually relevant
+    - Prevents gratuitous tagging
+    Mention targets include: @lisantherealone, @netprotocolapp,
+    @HyperliquidX, @CoinGecko, etc.
+
+Anti-Slop System:
+  A comprehensive list of banned phrases/patterns that indicate generic
+  AI-generated content ("slop"). Content matching these patterns is
+  regenerated. Examples of banned patterns:
+    - "buckle up", "deep dive", "let that sink in"
+    - "not financial advice" (redundant disclaimer)
+    - "stay tuned", "game changer"
+    - Excessive emoji sequences
+    - Generic crypto hype language
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.3 LLM INTEGRATION — src/engine/llm.ts (84 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Wrapper around the Anthropic Claude API.
+
+  generate(options: GenerateOptions) -> GenerateResult
+    Parameters:
+      - prompt:           User prompt text
+      - strategyContext:  Optional strategy weight context
+      - timeContext:      Optional time-of-day context
+      - maxTokens:        Max output tokens (default: 300)
+      - temperature:      Randomness (default: 0.9)
+
+    Process:
+      1. Builds system prompt via buildSystemPromptFromBrain()
+         (loads personality from Net Protocol if available, falls back to local)
+      2. Calls Anthropic's claude-3-5-haiku-20241022 model
+      3. Extracts text content from response
+      4. Returns: { content, inputTokens, outputTokens }
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.4 MEMORY SYSTEM — src/engine/memory.ts (127 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Tracks all posted content in Supabase (table: qasid_posts).
+
+  savePost(post, externalId?)
+    Saves a post record with all metadata (content, type, platform,
+    tone, topic, token counts, external tweet ID).
+
+  getRecentPosts(limit=20)
+    Fetches recent posts for deduplication and context injection.
+
+  wasRecentlyPosted(contentType, platform, windowHours=6)
+    Checks if a similar content type was recently posted.
+    Prevents the same type within a 6-hour window.
+
+  getTokenUsage(sinceDaysAgo=30)
+    Aggregates token usage for cost tracking.
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.5 DAILY BUDGET SYSTEM — src/engine/daily-budget.ts (265 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Enforces daily action limits to prevent over-posting and runaway costs.
+
+Budget Allocation (per UTC day):
+  DAILY_TOTAL_BUDGET = 45 actions
+    ├── X_BUDGET = 30 (all X platform actions)
+    │   ├── SCHEDULED_BUDGET = 10 (cron-driven posts)
+    │   └── DISCRETIONARY_BUDGET = 20 (creative session / replies / follows)
+    └── BOTCHAN_BUDGET = 15 (Net Protocol Botchan posts + replies)
+
+Action Types:
+  scheduled_post    Cron-driven X post (counts against SCHEDULED_BUDGET)
+  reply             Reply to trending/relevant tweet
+  mention_response  Response to an @mention
+  thread            Multi-tweet thread
+  quote_tweet       Quote tweet with commentary
+  follow            Strategic follow
+  bonus_post        Extra original content
+  engagement        Like/bookmark (does NOT count toward tweet limit)
+  botchan_post      Botchan native content (separate budget)
+
+Budget Enforcement (TOCTOU-Safe):
+  The recordAction() function uses an insert-then-check pattern:
+    1. INSERT the action row optimistically
+    2. Re-read today's total count
+    3. If over budget → DELETE the inserted row (atomic rollback)
+    4. Return false (action blocked)
+  This prevents time-of-check/time-of-use race conditions.
+
+  canTakeAction(actionType) — gate check before posting
+  recordAction(actionType, description, tweetId?) — record + enforce
+  getBudgetSummary() — human-readable status for LLM planner
+
+Token Cost Alerting:
+  checkTokenCostAlert() monitors daily LLM spend:
+    - Calculates estimated cost using Claude pricing
+      ($3/1M input tokens, $15/1M output tokens)
+    - Warns if daily spend exceeds $5.00 threshold
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.6 CREATIVE SESSIONS — src/engine/creative-session.ts (382 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+The LLM-planned autonomous action system. QasidAI decides what to do
+with remaining discretionary budget.
+
+  runCreativeSession()
+    1. Check discretionary budget remaining
+    2. Gather: budget summary, intel context
+    3. Ask LLM to plan 1-3 actions from available options:
+       - REPLY_TRENDING: Find and reply to trending tweets
+       - REPLY_MENTION: Respond to @mentions
+       - BONUS_POST: Post extra original content
+       - THREAD: Post a multi-tweet thread
+       - IMAGE_POST: Post a signal scorecard image
+       - SKIP: Save remaining budget
+    4. Execute each action in order, re-checking budget between actions
+
+Action Executors:
+  executeReplyTrending(intelContext)
+    - Searches X with crypto/AI queries (randomized)
+    - Filters for tweets with ≥2 likes
+    - LLM drafts sharp, value-adding reply (<200 chars)
+    - Checks dedup, posts reply
+
+  executeReplyMention(intelContext)
+    - Fetches recent @mentions
+    - Skips founder mentions (handled by VIP cron)
+    - LLM drafts contextual reply (<500 chars)
+
+  executeBonusPost()
+    - Generates via generatePost()
+    - Reserves budget before posting
+
+  executeThread()
+    - Generates via generateThread()
+    - Reserves budget before posting
+    - Requires minimum 2 tweets
+
+  executeImagePost()
+    - Generates scorecard image via generateScorecardImage()
+    - Posts with caption via postTweetWithImage()
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.7 MENTION MONITOR — src/engine/mention-monitor.ts (608 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Watches for @mentions and replies. Two separate systems:
+
+A) General Mention Monitor — runMentionMonitor()
+   Safety limits: 5 responses/cycle, 15 responses/day
+   Process:
+     1. Check 24h response count against daily limit
+     2. Load watermark (last processed mention ID from Supabase)
+     3. Fetch new mentions since watermark
+     4. For each mention:
+        a. Skip if already responded (Supabase check)
+        b. Skip if older than 6 hours (stale mention protection)
+        c. Check if founder skill approval reply → process approval
+        d. LLM classifies mention (QUESTION/ENGAGE/SPAM/SHILL)
+        e. LLM detects sentiment (POSITIVE/NEGATIVE/CURIOUS/HOSTILE/NEUTRAL)
+        f. LLM drafts reply matching sentiment (<500 chars)
+        g. Pre-reply dedup guard (race condition protection)
+        h. Post reply and record in Supabase
+     5. Update watermark to newest mention ID
+
+B) Founder VIP Monitor — runFounderMentionCheck()
+   Separate, prioritized cron for @lisantherealone mentions.
+   Safety limit: 20 replies/day
+   Key differences from general monitor:
+     - Does NOT use watermark (always scans 50 most recent mentions)
+     - Uses hasRespondedTo() for dedup instead
+     - Uses analytical prompt (CMO briefing tone, not casual)
+     - Fetches parent tweet context for thread tags
+     - Evaluates post-reply for learnable skills (autonomous skill discovery)
+     - Has in-memory session cache to avoid re-evaluating
+
+   Founder Prompt Design:
+     - Receives the tagged content + parent tweet context
+     - Responds like a sharp CMO peer, not a subordinate
+     - Never calls the founder "boss"
+     - Adjusts depth based on content complexity
+     - Pulls from intel context if market-related
+
+Conversation Threading:
+  getConversationHistory(authorUsername) fetches up to 3 recent replies
+  to the same author (last 7 days) and injects them into the prompt
+  with "don't repeat yourself" instructions.
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.8 TIMELINE SCANNER — src/engine/timeline-scanner.ts (292 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Proactive engagement: finds interesting tweets to reply to.
+
+  runTimelineScan()
+    Safety limits: 3 replies/cycle, 10 replies/day
+    Process:
+      1. Check 24h reply count
+      2. Pick random search query from curated list:
+         - "crypto signals", "AI agent", "technical analysis"
+         - "onchain AI", "autonomous finance", "win rate" trading
+         - "market regime", "machine learning" crypto
+      3. Fetch matching tweets from X API
+      4. Filter: skip own tweets, already-replied, <2 likes
+      5. LLM evaluates relevance (0-10 score):
+         - Score ≥7 → draft reply
+         - Score <7 → skip
+      6. LLM drafts contextual reply (<200 chars)
+      7. Full sanitization pass
+      8. Post reply, record in qasid_replies table
+
+  evaluateAndDraftReply(tweet, intelContext)
+    LLM prompt evaluates:
+      - Is the topic relevant to QasidAI's expertise?
+      - Does the tweet have enough engagement?
+      - Can QasidAI add genuine value?
+    Returns null for low-relevance tweets.
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.9 SMART FOLLOW ENGINE — src/engine/smart-follow.ts (164 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Strategically follows users who engage with QasidAI.
+
+  runSmartFollow()
+    Limits: 5 follows/cycle, 15 follows/day, 30-day cooldown
+    Strategy: Follow users who @mentioned QasidAI (warm leads)
+    Process:
+      1. Check 24h follow count against daily limit
+      2. Fetch recent mentions
+      3. Deduplicate by author
+      4. For each unique author:
+         - Skip self
+         - Skip if followed within 30-day cooldown
+         - Follow via X API
+         - Record in qasid_follows table
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.10 SCORECARD IMAGE GENERATOR — src/engine/scorecard-image.ts (206 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Generates branded signal scorecard PNG images using live data.
+
+  generateScorecardImage()
+    1. Fetches engine data (signals, regime, fear/greed)
+    2. Fetches proof data (win rate, recent outcomes)
+    3. Selects top signals (up to 6)
+    4. Builds SVG with Lisan brand colors:
+       - Cyan (#00d4ff) for LONG / gains
+       - Red (#ef4444) for SHORT / losses
+       - Yellow (#f59e0b) for HOLD / neutral
+       - Dark slate (#0f172a) background
+    5. Renders SVG → PNG via Sharp library (900x600 px)
+    6. Returns: { buffer: Buffer, caption: string }
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.11 INPUT SANITIZATION — src/engine/sanitize-input.ts (38 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Defends against prompt injection attacks on LLM inputs.
+
+  sanitizeUserInput(text, maxLength=500)
+    Strips known injection patterns before LLM ingestion:
+      - "ignore all previous instructions"
+      - "you are now a..."
+      - "act as if you are"
+      - "reveal your system prompt"
+      - "DAN jailbreak" patterns
+      - "repeat your instructions"
+    Truncates to maxLength (default 500) to prevent context overflow.
+    Used across ALL code paths that inject external text into prompts.
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.12 DYNAMIC KNOWLEDGE LAYER — src/engine/dynamic-knowledge.ts (151 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Runtime-learned facts that supplement the static brand-knowledge.ts.
+Stored in Supabase (table: qasid_knowledge) and injected into the system
+prompt at generation time.
+
+  loadDynamicKnowledge() → string | null
+    Fetches all active facts, returns formatted injection block.
+
+  addKnowledge(fact, source, sourceUrl?) → boolean
+    De-duplicates (case-insensitive substring match), sanitizes input,
+    then inserts new fact. Returns false if duplicate.
+
+  deactivateFact(id) → boolean
+    Soft-deletes a fact by ID.
+
+  deactivateByKeyword(keyword) → number
+    Soft-deletes all facts matching a keyword (ilike).
+    Escapes SQL wildcards (%, _) to prevent mass-deletion attacks.
+
+Fact Sources:
+  founder_instruction    From @lisantherealone's remember/update commands
+  founder_tweet          Extracted from founder's tweets
+  website_scan           Detected from website content changes
+  github_scan            Detected from GitHub repo/README changes
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.13 FOUNDER TWEET MONITOR — src/engine/founder-monitor.ts (229 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Passively monitors the founder's X account (@Lisantherealone) for new
+tweets and extracts factual information using an LLM.
+
+  runFounderMonitor() → number (facts stored)
+    1. Attempts to fetch recent tweets via X API (user timeline)
+    2. Falls back to X syndication endpoint if API tier is insufficient
+    3. De-duplicates against qasid_founder_tweets table
+    4. For each new tweet: LLM extracts factual information
+    5. Stores extracted facts in qasid_knowledge table
+    Runs every 2 hours via cron.
+
+  extractFactsFromTweet(tweetText) → string[] | null
+    LLM prompt evaluates tweet for company news, product updates,
+    strategic direction, personal updates. Returns NONE for casual tweets.
+    Input is sanitized via sanitizeUserInput() before LLM injection.
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.14 WEBSITE MONITOR — src/engine/website-monitor.ts (173 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Scrapes specified Lisan Holdings web pages and detects content changes
+using SHA256 hashing.
+
+  runWebsiteMonitor() → number (facts stored)
+    Monitored URLs:
+      - lisanholdings.dev ("Lisan Holdings homepage")
+      - lisanintel.com ("LISAN Intelligence")
+      - lisanintel.com/proof ("LISAN Intelligence Proof")
+    Process:
+      1. Fetch page content via HTTP
+      2. Hash content with SHA256
+      3. Compare against stored hash in qasid_content_hashes
+      4. If changed: LLM extracts factual differences
+      5. Stores new facts + updated hash
+    Runs daily at 4:00 AM ET.
+    Content is sanitized via sanitizeUserInput() before LLM injection.
+
+
+────────────────────────────────────────────────────────────────────────────────
+4.15 GITHUB ORG MONITOR — src/engine/github-monitor.ts (196 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Monitors the LisanXG GitHub organization for new repos and README changes.
+Uses the public GitHub API (no authentication required).
+
+  runGitHubMonitor() → number (facts stored)
+    1. Fetches all public repos in the LisanXG org
+    2. For each repo: fetches README content (Base64-decoded)
+    3. Hashes README, compares against qasid_content_hashes
+    4. For new or changed repos: LLM extracts facts
+    5. Stores facts in qasid_knowledge
+    Runs daily at 4:30 AM ET.
+    README content is sanitized via sanitizeUserInput() before LLM injection.
+
+
+================================================================================
+5. LEARNING ENGINE
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+5.1 STRATEGY WEIGHTS — src/learning/weights.ts (264 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Manages adaptive strategy weights across 4 dimensions.
+
+Weight Dimensions:
+  1. content_type_weights — Which content types perform best
+  2. time_weights        — Which UTC hours get highest engagement
+  3. tone_weights        — Which tones resonate most
+  4. topic_weights       — Which topics drive engagement
+
+Parameters:
+  MIN_WEIGHT = 5       (prevents any type from dropping to 0)
+  MAX_WEIGHT = 30      (prevents over-concentration)
+  LEARNING_RATE = 0.2  (moderate adaptation speed)
+
+  adaptWeights()
+    Runs daily. Analyzes last 7 days of scored posts (needs ≥5):
+    1. Calculate overall average performance score
+    2. For each dimension (content type, hour, tone, topic):
+       a. Calculate per-category average
+       b. Compute diff from overall average
+       c. Adjust weight: new = current + (diff × LEARNING_RATE)
+       d. Clamp to [MIN_WEIGHT, MAX_WEIGHT]
+    3. Normalize content_type_weights to sum to 100
+    4. Save to Supabase (qasid_strategy table)
+    5. Snapshot to Net Protocol (on-chain brain)
+
+  getStrategyContext() -> string
+    Generates human-readable strategy context for LLM prompt injection:
+    - Top 3 content types, bottom 3
+    - Best posting hours (UTC)
+    - Best performing tones
+    - Hot topics
+
+  loadWeights() / saveWeights()
+    Supabase persistence (upsert with id='current').
+    Seeds defaults on first run.
+
+
+────────────────────────────────────────────────────────────────────────────────
+5.2 POST SCORER — src/learning/scorer.ts (171 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Scores post performance (0-100) after a 24-hour window.
+
+Scoring Formula v2:
+  Base Score (log-normalized):
+    - Reactions weight: 35%  (32 reactions → max)
+    - Replies weight:   35%  (16 replies → max)
+    - Impressions:      20%  (1024 impressions → max)
+    Formula: log2(metric + 1) / normalization_factor
+
+  Engagement Rate Bonus:
+    If impressions > 50 and (reactions + replies) / impressions > 2%:
+    → +10 points (viral signal indicator)
+
+  Content-Type Benchmarking:
+    If above type-average by 20%+ → +5 bonus
+    If below type-average by 50%+ → -5 penalty
+    (Requires ≥3 posts of that type for benchmarking)
+
+  Time Decay:
+    Posts older than 48h → 10% reduction per additional day
+    Maximum decay: 30% (decayFactor floors at 0.70)
+
+  scoreOldPosts()
+    1. Refresh content-type averages from last 200 scored posts
+    2. Fetch unscored posts older than 24h
+    3. Calculate score for each
+    4. Update performance_score in Supabase
+
+
+────────────────────────────────────────────────────────────────────────────────
+5.3 ENGAGEMENT PIPELINE — src/learning/engagement.ts (139 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Fetches real tweet metrics from the X API and backfills Supabase.
+Run BEFORE scoring so the scorer has real data.
+
+  fetchAndUpdateEngagement()
+    Two-pass metric collection:
+      Pass 1: Posts with NO metrics yet (reactions is null)
+      Pass 2: Posts from last 48h (re-fetch for freshness)
+    Deduplicates by post ID.
+    Calls getTweetMetrics() (batched, up to 100 tweet IDs per call).
+    Updates each post's reactions, replies, and impressions in Supabase.
+
+
+────────────────────────────────────────────────────────────────────────────────
+5.4 PERFORMANCE TRACKER — src/learning/tracker.ts (71 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+  updatePostMetrics(update)
+    Updates reactions, replies, and linkClicks for a specific post.
+
+  getUnscoredPosts(olderThanHours=24)
+    Returns posts with no performance_score that are older than the
+    specified window.
+
+
+────────────────────────────────────────────────────────────────────────────────
+5.5 META REVIEW — src/learning/meta-review.ts (128 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Weekly analysis of whether learning is improving engagement.
+
+  runMetaReview()
+    1. Fetch this week's and last week's scored posts
+    2. Calculate average performance scores
+    3. Identify best/worst content types
+    4. Build platform breakdown
+    5. Determine trend:
+       - diff > 3 → "improving"
+       - diff < -3 → "declining"
+       - else → "stable"
+    6. Save report to qasid_meta_reviews table
+    7. Snapshot to Net Protocol (on-chain brain)
+
+  WeeklyReport includes:
+    week, totalPosts, avgPerformanceScore, bestContentType,
+    worstContentType, platformBreakdown, trend
+
+
+================================================================================
+6. NET PROTOCOL INTEGRATION (ON-CHAIN BRAIN)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+6.1 CLIENT — src/net/client.ts (318 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Low-level wrapper around Net Protocol SDK (Botchan).
+
+Key Functions:
+  ensureClients()      Initialize wallet, Botchan client, storage client
+  getWalletAddress()   Derive wallet address from NET_PRIVATE_KEY
+  writeStorage(key, desc, data) → txHash
+                       Write data to Net Protocol storage (on-chain)
+  readStorage(key)     Read latest value for a storage key
+  getTotalVersions(key) Count stored versions for a key
+  postToFeed(text, topic?) → postId
+                       Post to the Botchan feed
+
+Chain: Base L2 (Ethereum Layer 2)
+Wallet: Derived from NET_PRIVATE_KEY via viem's privateKeyToAccount
+Gas: Requires ETH on Base for storage write transactions
+
+
+────────────────────────────────────────────────────────────────────────────────
+6.2 BRAIN MANAGER — src/net/brain.ts (208 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Manages QasidAI's on-chain personality, knowledge, and strategy.
+
+Storage Keys:
+  qasid-personality      System prompt template
+  qasid-brand-knowledge  Lisan Holdings product/founder info
+  qasid-strategy         Strategy weights (updated daily)
+  qasid-meta-review      Weekly meta review report
+  qasid-profile          Agent profile data
+  qasid-daily-{date}     Daily post summaries
+
+Key Functions:
+  uploadPersonality(data)       → txHash
+  uploadBrandKnowledge(data)    → txHash
+  downloadPersonality()         → string | null
+  downloadBrandKnowledge()      → string | null
+  snapshotStrategy(data)        → txHash (called after daily adaptation)
+  snapshotMetaReview(data)      → txHash (called after weekly review)
+  writeDailySummary(date, data) → txHash
+  uploadFullBrain(personality, brand) — bulk upload for initial setup
+  getStrategyVersionCount()     → number of on-chain strategy versions
+
+
+────────────────────────────────────────────────────────────────────────────────
+6.3 BOTCHAN CONTENT — src/net/botchan-content.ts (241 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Generates content specifically for the Net Protocol Botchan feed.
+Different voice/length than X — more technical, longer-form.
+
+Botchan Content Types:
+  market_deep_dive    Extended market analysis
+  signal_breakdown    Detailed signal interpretation
+  builder_log         Development diary / behind-the-scenes
+  cross_post          Best X content adapted for Botchan
+  ecosystem_take      Net Protocol ecosystem commentary
+  github_share        Open-source tools & repos
+  capability_share    Agent capabilities & architecture
+
+Topic Mapping:
+  market_deep_dive  → "trading"
+  builder_log       → "agent-finance"
+  ecosystem_take    → "net-ecosystem"
+  github_share      → "agent-dev"
+
+  runBotchanContentCycle(preferredType?)
+    1. Check budget (canTakeAction → 'botchan_post')
+    2. Generate content via LLM (longer-form, technical)
+    3. Post to Botchan feed via postToFeed()
+    4. Record action against budget
+
+Architecture Sharing:
+  The bot can share details about its own capabilities, including:
+  - 10 scheduled posts/day with forced content variety
+  - v2 scoring engine with engagement-rate detection
+  - Circuit breaker retry logic
+  - Anti-slop engine with 30+ banned phrase patterns
+  - Contextual @-mention system based on topic relevance
+  - On-chain brain via Net Protocol
+  - Dynamic knowledge layer with automated fact ingestion
+
+
+────────────────────────────────────────────────────────────────────────────────
+6.4 BOTCHAN REPLIES — src/net/botchan-replies.ts (366 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Monitors the Botchan feed for replies to QasidAI's posts and responds.
+
+  monitorBotchanReplies()
+    1. Derives own wallet address via getWalletAddress() from client.ts
+    2. Fetches recent Botchan feed posts
+    3. Identifies replies to QasidAI's own posts
+    4. Deduplicates against already-processed replies
+    5. For each new reply:
+       a. Generates contextual LLM response
+       b. Posts reply to Botchan feed
+       c. Records response for dedup
+
+Note: This module previously had a bug where wallet derivation used a
+CommonJS require() in an ESM project. Fixed by importing getWalletAddress()
+from client.ts.
+
+
+────────────────────────────────────────────────────────────────────────────────
+6.5 DAILY SUMMARY — src/net/daily-summary.ts (88 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Aggregates the day's posts into an on-chain digest.
+
+  buildAndWriteDailySummary()
+    1. Fetch all posts from today (UTC) from Supabase
+    2. Build summary: total posts, platforms, content types, token usage
+    3. Write to Net Protocol with key: qasid-daily-{YYYY-MM-DD}
+    Called by the end-of-day cron job (23:55 UTC).
+
+
+================================================================================
+7. PERSONALITY SYSTEM
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+7.1 SYSTEM PROMPT — src/personality/system-prompt.ts (243 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Builds the system prompt that defines QasidAI's voice and behavior.
+
+  buildSystemPrompt(strategyContext?, timeContext?)
+    Constructs a detailed system prompt incorporating:
+    - Core identity: "QasidAI — autonomous CMO of Lisan Holdings"
+    - Brand knowledge (from brand-knowledge.ts)
+    - Strategy context (from learning engine weights)
+    - Time-of-day awareness
+    - Posting rules and constraints
+    - Anti-slop guidelines
+
+  buildSystemPromptFromBrain(strategyContext?, timeContext?)
+    Enhanced version that:
+    1. Checks Net Protocol for on-chain personality override
+    2. Caches on-chain personality for 6 hours (TTL)
+    3. Falls back to local buildSystemPrompt() if chain unavailable
+    4. Appends dynamic knowledge facts from qasid_knowledge table
+
+Content Types (14 total, exported as contentTypes array):
+  gm_post, signal_scorecard, win_streak, market_regime, challenge,
+  founder_journey, builder_narrative, countdown_tease, product_spotlight,
+  educational, social_proof, engagement_bait, self_aware, cross_platform
+
+
+────────────────────────────────────────────────────────────────────────────────
+7.2 BRAND KNOWLEDGE — src/personality/brand-knowledge.ts (253 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Comprehensive knowledge base about Lisan Holdings, structured as a
+TypeScript object. Includes:
+
+Founder Profile:
+  - Name: Lisan, Handle: @lisantherealone
+  - Background: US Navy Special Forces (Systems Admin + Reaction Force
+    Team Leader), self-taught full-stack developer
+  - Vibe: "Not a startup founder. Not a DAO operator. Just a builder
+    who ships and shows receipts."
+  - Philosophical inspirations: Satoshi, Vitalik, sartoshi, Jeff Yan
+  - Content angles: military-to-tech transition, solo builder ethos,
+    anti-hype philosophy, "tired of watching people get wrecked"
+
+Company Info:
+  - Lisan Holdings, website: lisanholdings.dev
+  - GitHub: github.com/LisanXG
+  - Tagline: "One builder. Real products. No hype."
+
+Products:
+  1. LISAN Intelligence (lisanintel.com)
+     - ML-powered crypto signal engine
+     - 12 technical indicators + 6 clusters
+     - Outputs: LONG/SHORT/HOLD with confidence, SL/TP
+     - Self-learning weight adaptation after wins/losses
+     - Free, transparent, proof at /proof
+     - Important disclaimers: "NOT a trading bot, NOT financial advice"
+
+  2. Lisan Score (TradingView PineScript indicator)
+     - Same methodology as web platform
+     - Native to TradingView charts
+     - Free under Mozilla Public License 2.0
+
+  3. QasidAI (this agent)
+     - "The Qasid" = "The Messenger" in Arabic
+     - Autonomous CMO with self-learning engine
+     - On-chain brain via Net Protocol
+     - Anti-slop engine with 30+ banned patterns
+     - "Not a chatbot. Not a scheduler. A digital entity."
+
+  4. Net Protocol Integration
+     - On-chain brain for permanent memory
+     - Botchan feed posting
+     - Strategy snapshots and meta reviews
+
+
+================================================================================
+8. X (TWITTER) PLATFORM INTEGRATION
+================================================================================
+
+File: src/platforms/x.ts (566 lines)
+
+Full X API v2 connector using twitter-api-v2 library.
+
+Posting Functions:
+  postTweet(text)           → tweetId | null
+  postThread(tweets[])      → tweetId[] (chains via in_reply_to_tweet_id)
+  postTweetWithImage(text, buffer, mimeType) → tweetId | null
+                            Uploads media then creates tweet with mediaIds
+
+Reading Functions:
+  getMentions(sinceId?, max=10)     → MentionTweet[]
+                                     Fetches @mentions with user expansion
+  getTweetById(tweetId)             → { text, authorUsername } | null
+  getTweetMetrics(tweetIds[])       → Map<tweetId, PublicMetrics>
+                                     Batched lookup, up to 100 per call
+  searchRecentTweets(query, max=10) → SearchResult[]
+                                     Full-text search with engagement metrics
+  getRepliesTo(tweetId)             → SearchResult[]
+                                     Uses conversation_id search
+
+Interaction Functions:
+  replyToTweet(tweetId, text)       → replyTweetId | null
+  followUser(userId)                → boolean
+
+Diagnostics:
+  checkXCapabilities()   Comprehensive API capability test:
+    - Authentication (2-legged)
+    - Profile read
+    - Mention fetching
+    - Tweet metrics access
+    - Recent tweet search
+    - DM access check
+
+Utility:
+  getMyUserId()    Cached authenticated user ID
+  getMyUsername()   Cached authenticated username
+
+Dry-Run Mode:
+  When POSTING_ENABLED=false, postTweet/postThread/replyToTweet
+  log the content but return a "dry-run-{uuid}" ID instead of posting.
+
+
+================================================================================
+9. SKILLS SYSTEM
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+9.1 SKILL MANAGER — src/skills/skill-manager.ts (608 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Autonomous skill discovery, approval, and execution system.
+
+Skill Structure:
+  id, name, description, category, source, sourceUrl, prompt,
+  examples, learnedAt, usageCount, lastUsed, confidence, status,
+  approvalTweetId
+
+Skill Categories:
+  content, engagement, analysis, technical, meta
+
+Skill Sources:
+  built_in, timeline, x_search, founder_tag, manual
+
+Skill Statuses:
+  active, pending, denied
+
+Built-in Skills (always active, no approval needed):
+  1. signal-scorecard     Generate branded scorecard image
+  2. trending-reply       Draft sharp reply to trending tweets
+  3. market-regime-commentary  Interpret market regime for traders
+  4. anti-slop-refiner    Check for AI slop and suggest natural alternatives
+
+Discovery Flow:
+  discoverSkillFromContent(content, source, sourceUrl?)
+    1. LLM evaluates if content contains a learnable technique
+    2. LLM extracts skill metadata (name, description, prompt template)
+    3. Deduplicates against existing skills (by name similarity)
+    4. Saves as "pending" status
+    5. Posts approval request tweet tagging @lisantherealone
+    6. Max 3 proposals per day (anti-spam)
+    Returns: Skill | null
+
+Approval Flow:
+  processSkillApproval(replyText, inReplyToTweetId)
+    Called by mention monitor when founder replies to a skill proposal.
+    - "approve", "yes", "go", "learn" → activate skill
+    - "deny", "no", "skip", "pass" → deny skill
+    Updates status in Supabase and syncs to Net Protocol.
+
+On-Chain Storage:
+  syncSkillsToChain() — uploads active skills to Net Protocol
+  loadSkillsFromChain() — restores skills from on-chain data
+
+Initialization:
+  initializeSkills() loads from Supabase, merges with built-ins,
+  assigns stable timestamps for built-in skills to prevent
+  timestamp reset on every deploy.
+
+
+────────────────────────────────────────────────────────────────────────────────
+9.2 SKILL SCOUT — src/skills/skill-scout.ts (128 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Autonomous X search for learnable skills. Runs 2x daily.
+
+  runSkillScout()
+    1. Pick 2-3 random search queries:
+       - "AI agent skill", "autonomous agent framework"
+       - "engagement hack", "viral tweet technique"
+       - "on-chain agent tool", "image generation agent"
+       - "AI CMO", "autonomous marketing" web3
+    2. Search X with each query (15 results)
+    3. Filter for quality (≥5 likes or ≥2 retweets)
+    4. Sort by engagement, take top 3
+    5. LLM pre-screen: "Is this a SPECIFIC, CONCRETE technique?"
+       - Say NO to opinions, jokes, vague buzzwords, inaccessible tools
+    6. Pass successful candidates to discoverSkillFromContent()
+    7. Max 2 proposals per scout run
+
+Discovery → Approval Pipeline:
+  SkillScout finds → SkillManager proposes → Founder approves on X
+  → Skill activated → synced to Net Protocol on-chain
+
+
+================================================================================
+10. DATA & INTELLIGENCE
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+10.1 LISAN INTELLIGENCE CLIENT — src/data/intelligence.ts (327 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Fetches live signal data from lisanintel.com API.
+
+Data Types:
+  Signal: coin, direction (LONG/SHORT/HOLD), score, agreement,
+          entry/SL/TP prices, risk-reward ratio, breakdown by cluster
+          (momentum, trend, volume, sentiment, volatility, positioning)
+
+  ProofStats: totalSignals, wins, losses, winRate, cumulativeReturn
+
+  MarketData: regime, fearGreedIndex, fearGreedLabel
+
+  RecentOutcome: coin, direction, profit_pct, outcome (WON/LOST)
+
+API Endpoints:
+  /api/engine/signals  → signals, regime, fear/greed
+  /api/proof/stats     → bucket stats, summary, recent outcomes
+  /api/market          → coin prices and 24h changes
+  /api/fear-greed      → fear & greed index
+
+  gatherIntelContext() → string
+    Assembles all available intelligence into a formatted context string
+    for LLM prompt injection. Includes:
+    - Active signals with scores and directions
+    - Market regime and confidence
+    - Fear & Greed index with label
+    - Proof stats (win rate, cumulative return)
+    - Recent trade outcomes (wins/losses)
+    - Top moving coins with 24h changes
+
+
+────────────────────────────────────────────────────────────────────────────────
+10.2 MARKET DATA — src/data/market.ts (62 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+  getTrendingCoins() → TrendingCoin[]
+    Fetches top 5 trending coins from CoinGecko (free, no API key).
+    Returns symbol, name, and 24h price change percentage.
+
+  gatherMarketContext() → string
+    Formats trending coins for LLM context injection.
+
+
+================================================================================
+11. UTILITIES
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+11.1 LOGGER — src/logger.ts (46 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Simple structured logger with levels: debug, info, warn, error.
+
+  createLogger(component) returns an object with debug/info/warn/error
+  methods. Each log line includes:
+    [ISO_TIMESTAMP] [LEVEL] [COMPONENT] message {optional_json_data}
+
+  setLogLevel(level) adjusts the minimum log level.
+  Default level: info.
+
+
+────────────────────────────────────────────────────────────────────────────────
+11.2 RETRY WITH CIRCUIT BREAKER — src/retry.ts (169 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+  withRetry(fn, options?)
+    Exponential backoff retry with circuit breaker pattern.
+
+    Options:
+      maxRetries (default: 3)
+      baseDelayMs (default: 2000ms, doubled each attempt)
+      skipClientErrors (default: true — no retry on 4xx)
+      label (for logging)
+      circuitBreakerKey (shared circuit breaker group)
+
+    Circuit Breaker:
+      FAILURE_THRESHOLD = 5 consecutive failures → circuit opens
+      COOLDOWN_MS = 5 minutes
+      States: CLOSED → OPEN → HALF-OPEN (probe) → CLOSED
+      Prevents cascading failures when external services are down.
+
+    Special Cases:
+      - "insufficient funds" / "exceeds balance" → no retry, record failure
+      - 4xx status codes → no retry, don't count as circuit breaker failure
+
+  getCircuitBreakerStatus() — diagnostic view of all breaker states
+
+
+────────────────────────────────────────────────────────────────────────────────
+11.3 SUPABASE CLIENT — src/supabase.ts (11 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+  Exports a shared Supabase client using the service role key.
+  Service role bypasses Row Level Security for server-side access.
+
+
+================================================================================
+12. DATABASE (SUPABASE)
+================================================================================
+
+Tables (created via migration files in supabase/migrations/):
+
+  qasid_posts
+    Primary content store. Fields:
+    id, content, content_type, platform, tone, topic,
+    input_tokens, output_tokens, posted_at, external_id,
+    reactions, replies, link_clicks, performance_score
+
+  qasid_daily_actions
+    Daily budget tracking. Fields:
+    id, day (YYYY-MM-DD), action_type, description,
+    tweet_id, created_at
+
+  qasid_strategy
+    Strategy weights (single row, id='current'). Fields:
+    id, content_type_weights, time_weights, tone_weights,
+    topic_weights, updated_at
+
+  qasid_replies
+    Reply/mention response tracking. Fields:
+    id, target_tweet_id, target_author, reply_tweet_id,
+    reply_text, search_query (source), replied_at
+
+  qasid_mention_state
+    Mention watermark (single row, id='current'). Fields:
+    id, last_mention_id, updated_at
+
+  qasid_follows
+    Follow tracking. Fields:
+    id, target_user_id, target_username, source, reason,
+    followed_at
+
+  qasid_meta_reviews
+    Weekly meta reviews. Fields:
+    id, week_start, week_end, total_posts,
+    avg_performance_score, best_content_type,
+    worst_content_type, trend, report (JSONB)
+
+  qasid_skills
+    Skill registry. Fields:
+    id, name, description, category, source, source_url,
+    prompt, examples, learned_at, usage_count, last_used,
+    confidence, status, approval_tweet_id
+
+  qasid_knowledge (migration-v3-knowledge.sql)
+    Runtime-learned facts. Fields:
+    id, fact, source, source_url, active, created_at
+
+  qasid_content_hashes (migration-v3-knowledge.sql)
+    Change detection for monitored content. Fields:
+    id, url, content_hash, raw_text, updated_at
+
+  qasid_founder_tweets (migration-v3-knowledge.sql)
+    De-duplication for processed founder tweets. Fields:
+    id, tweet_id, processed_at
+
+
+================================================================================
+13. CRON SCHEDULE — FULL BREAKDOWN
+================================================================================
+
+File: src/scheduler/cron.ts (571 lines)
+
+All times are US Eastern (America/New_York). The scheduler runs 31 cron jobs:
+
+Content Generation (10 scheduled X posts):
+  06:00 ET  GM Post (forced content type: gm_post)
+  08:00 ET  Morning Signal Scorecard (image with text fallback)
+  10:00 ET  Builder Narrative / Founder Journey
+  12:00 ET  Educational / Methodology
+  14:00 ET  Engagement / Hot Take
+  16:00 ET  Product Spotlight
+  18:00 ET  Self-Aware / Meta AI Commentary
+  20:00 ET  Signal Performance / Proof
+  22:00 ET  Engagement Bait / Founder Journey
+  23:30 ET  Evening Reflection / Social Proof
+
+Creative Sessions (discretionary budget, 4 per day):
+  09:30 ET  Morning Creative Session
+  13:30 ET  Afternoon Creative Session
+  17:30 ET  Evening Creative Session
+  21:30 ET  Night Creative Session
+
+Net Protocol / Botchan (5 native posts + replies):
+  09:00 ET  Botchan Ecosystem / Capability Post
+  11:00 ET  Botchan Market Analysis / Signal Breakdown
+  15:00 ET  Botchan Net Reflection / Tool Spotlight
+  19:00 ET  Botchan Builder Log / Capability / GitHub
+  21:00 ET  Botchan Market Wrap / Builder Log
+  */30min   Botchan Reply Monitor
+  11:55 PM ET  Daily Summary (on-chain digest)
+
+Mention Monitoring:
+  */15min   Founder VIP Mention Check (every 15 minutes)
+  */30min   General Mention Monitor (every 30 minutes)
+
+Learning Engine:
+  00:30 ET  Engagement Pipeline (fetch X API metrics)
+  01:00 ET  Daily Learning (re-fetch → score → adapt weights)
+  Sun 02:00 ET  Weekly Meta Review (Sundays only)
+
+Growth & Skills:
+  03:00 ET  Smart Follow Cycle
+  01:30 ET  Skill Sync to Net Protocol
+  10:00 ET  Skill Scout Session #1
+  22:00 ET  Skill Scout Session #2
+
+Knowledge System:
+  */2h      Founder Tweet Monitor (every 2 hours, at :05 offset)
+  04:00 ET  Website Monitor (daily)
+  04:30 ET  GitHub Org Monitor (daily)
+  03:00 ET  Auto Brain Sync to Net Protocol (daily)
+
+
+================================================================================
+14. SECURITY NOTES
+================================================================================
+
+A) Secret Management
+   - All secrets stored in .env (gitignored)
+   - Zod validation ensures correct format at startup
+   - NET_PRIVATE_KEY validated as 0x-prefixed, 66-character hex string
+   - Supabase uses service_role key (server-side, bypasses RLS)
+
+B) Output Security (sanitizeContent)
+   - Wallet address pattern detection (0x followed by 40-64 hex chars)
+   - Private key pattern blocking
+   - URL allowlisting (only approved domains pass through)
+   - Content containing secrets → replaced with safe fallback text
+
+C) Input Security (sanitizeUserInput)
+   - Prompt injection pattern stripping (12 regex patterns)
+   - Input truncation (500 char default) to prevent context overflow
+   - Applied to ALL external text before LLM prompt injection
+
+D) Rate Limiting & Budget
+   - 45 actions/day total budget (hard limit)
+   - 15 mention responses/day
+   - 10 timeline replies/day
+   - 15 follows/day
+   - 20 founder replies/day
+   - 15 Botchan posts/day
+   - 3 skill proposals/day
+   - TOCTOU-safe budget enforcement (insert-then-check pattern)
+
+E) SQL Injection Prevention
+   - Supabase parameterized queries for all DB operations
+   - SQL wildcards (%, _) escaped in deactivateByKeyword() ilike patterns
+   - Prevents "forget: %" attack from matching all stored facts
+
+F) Circuit Breaker
+   - 5 consecutive failures → circuit opens
+   - 5-minute cooldown → half-open probe
+   - Prevents cascading failures to external services
+   - Per-key isolation (X API, Net Protocol can break independently)
+
+G) Anti-Slop
+   - 30+ banned phrases/patterns that indicate generic AI content
+   - Content matching slop patterns is regenerated (up to 3 retries)
+   - Prevents QasidAI from posting cliché/generic crypto content
+
+H) Deduplication
+   - Pre-reply dedup guard before every post (race condition protection)
+   - Mention watermark system prevents re-processing old mentions
+   - 6-hour stale mention cutoff prevents replying to old tags
+   - In-memory session cache for founder mentions
+   - wasRecentlyPosted() prevents same content type within 6h window
+
+
+================================================================================
+15. DEPLOYMENT & MAINTENANCE
+================================================================================
+
+Deployment Platform: Railway
+  - Auto-deploys from GitHub main branch pushes
+  - Build command: npx tsx src/index.ts
+  - All env vars configured in Railway dashboard
+
+Deployment Steps:
+  1. Make code changes locally
+  2. git add -A && git commit -m "description"
+  3. git push origin main
+  4. Railway auto-builds and deploys (~2-3 minutes)
+  5. Monitor Railway logs for startup confirmation
+
+Environment Setup (new deployment):
+  1. Create Supabase project
+  2. Run migration files in order:
+     - supabase/migrations/migration.sql
+     - supabase/migrations/migration-v2-replies.sql
+     - supabase/migrations/migration-update.sql
+      - supabase/migrations/migration-v3-knowledge.sql
+  3. Create X developer app with OAuth 1.0a (read+write)
+  4. Set up Railway service
+  5. Configure all env vars (see Section 3)
+  6. Enable posting: POSTING_ENABLED=true
+  7. Enable Net Protocol: NET_ENABLED=true, NET_PRIVATE_KEY=0x...
+  8. Fund wallet with ETH on Base L2 for gas
+
+CLI Diagnostic Commands:
+  npx tsx src/index.ts --check-x        Test X API capabilities
+  npx tsx src/index.ts --net-status     Test Net Protocol connection
+  npx tsx src/index.ts --test           Generate test post (dry run)
+  npx tsx src/index.ts --learn          Run learning cycle manually
+  npx tsx src/index.ts --meta-review    Run weekly meta review manually
+  npx tsx src/index.ts knowledge-sync   Run all knowledge monitors
+
+Monitoring:
+  - Railway logs show structured log output with timestamps and components
+  - Budget status visible via getBudgetSummary()
+  - Circuit breaker status via getCircuitBreakerStatus()
+  - Token cost alerts trigger at >$5/day spend
+  - Weekly meta reviews track engagement trends
+
+Initial Brain Upload:
+  npx tsx src/index.ts --net-upload
+  Uploads personality + brand knowledge to Net Protocol.
+  Requires ETH on Base L2 for gas fees.
+
+Key Dependencies (package.json):
+  @anthropic-ai/sdk    Claude API client
+  @supabase/supabase-js  Supabase client
+  botchan              Net Protocol Botchan SDK
+  node-cron            Cron job scheduler
+  sharp                SVG → PNG image processing
+  twitter-api-v2       X (Twitter) API v2 client
+  viem                 Ethereum wallet & signing
+  zod                  Runtime type validation
+
+
+================================================================================
+  END OF DOCUMENTATION
+  QasidAI — The Messenger — Autonomous CMO for Lisan Holdings
+================================================================================
