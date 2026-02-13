@@ -1,5 +1,5 @@
 import { generate } from './llm.js';
-import { getMentions, replyToTweet, type MentionTweet } from '../platforms/x.js';
+import { getMentions, replyToTweet, getTweetById, type MentionTweet } from '../platforms/x.js';
 import { gatherIntelContext } from '../data/intelligence.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
@@ -193,14 +193,21 @@ REPLY: [your reply text, or "none"]`;
 async function draftFounderMentionResponse(
     mention: MentionTweet,
     intelContext: string,
+    parentTweet?: { text: string; authorUsername?: string } | null,
 ): Promise<string | null> {
+    // Build thread context section
+    let threadContext = '';
+    if (parentTweet) {
+        threadContext = `\n\nTHE ORIGINAL POST BEING DISCUSSED (by @${parentTweet.authorUsername ?? 'unknown'}):\n"${parentTweet.text}"\n\nYour boss tagged you in the replies to this post. Analyze BOTH the original post AND your boss's comment.`;
+    }
+
     const prompt = `Your founder and boss (@lisantherealone) tagged you (@QasidAI) in a post on X.
 
 When the boss tags you, it's important. He's sharing intel — a competing agent, a new tool, a capability to evaluate, or something relevant to Lisan Holdings. Treat this as a briefing.
 
-THE POST YOUR BOSS TAGGED YOU IN:
+YOUR BOSS'S TAG:
 "${mention.text}"
-${mention.inReplyToUserId ? '(This is in a reply thread — the boss tagged you in someone else\'s post. He wants you to analyze what that person is saying.)' : '(This is a direct tag from the boss.)'}
+${mention.inReplyToUserId ? '(This is in a reply thread — the boss tagged you in someone else\'s post. He wants you to analyze what that person is saying.)' : '(This is a direct tag from the boss.)'}${threadContext}
 
 YOUR TASK:
 1. ANALYZE what's being shared:
@@ -447,7 +454,19 @@ export async function runFounderMentionCheck(): Promise<number> {
         }
 
         // Draft a contextual response (founder-specific analytical prompt)
-        const replyText = await draftFounderMentionResponse(mention, intelContext);
+        // Fetch parent tweet context if this is a thread tag
+        let parentTweet: { text: string; authorUsername?: string } | null = null;
+        if (mention.conversationId && mention.conversationId !== mention.id) {
+            parentTweet = await getTweetById(mention.conversationId);
+            if (parentTweet) {
+                log.info('👑 Fetched parent tweet context', {
+                    parentAuthor: parentTweet.authorUsername,
+                    parentPreview: parentTweet.text.slice(0, 80),
+                });
+            }
+        }
+
+        const replyText = await draftFounderMentionResponse(mention, intelContext, parentTweet);
         if (!replyText) continue;
 
         // Post the reply

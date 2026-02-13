@@ -321,6 +321,33 @@ export interface SearchResult {
 }
 
 /**
+ * Fetch a single tweet by ID. Returns text and author info.
+ * Useful for fetching parent tweet context when replying in threads.
+ */
+export async function getTweetById(tweetId: string): Promise<{ text: string; authorUsername?: string } | null> {
+    try {
+        const response = await getClient().v2.tweets([tweetId], {
+            'tweet.fields': ['author_id', 'text', 'created_at'],
+            expansions: ['author_id'],
+            'user.fields': ['username'],
+        });
+        const tweet = response.data?.[0];
+        if (!tweet) return null;
+
+        const users = response.includes?.users ?? [];
+        const author = users.find(u => u.id === tweet.author_id);
+
+        return {
+            text: tweet.text,
+            authorUsername: author?.username,
+        };
+    } catch (error: any) {
+        log.error('Failed to fetch tweet by ID', { error: String(error), tweetId });
+        return null;
+    }
+}
+
+/**
  * Reply to a specific tweet. Returns the reply tweet ID.
  */
 export async function replyToTweet(tweetId: string, text: string): Promise<string | null> {

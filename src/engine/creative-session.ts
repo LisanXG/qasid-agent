@@ -127,12 +127,17 @@ Reply with ONLY the tweet text (or "SKIP"):`,
 
 /**
  * Execute a REPLY_MENTION action.
+ * NOTE: Skips founder (@lisantherealone) mentions — those are handled
+ * by the dedicated VIP mention cron with a better analytical prompt.
  */
 async function executeReplyMention(intelContext: string): Promise<boolean> {
     const sinceId = await getLastMentionId();
     const mentions = await getMentions(sinceId, 10);
 
     for (const mention of mentions) {
+        // Skip founder mentions — handled by VIP cron
+        if (mention.authorUsername?.toLowerCase() === 'lisantherealone') continue;
+
         if (await hasRepliedTo(mention.id)) continue;
 
         const result = await generate({
@@ -141,12 +146,12 @@ async function executeReplyMention(intelContext: string): Promise<boolean> {
 FROM: @${mention.authorUsername ?? 'unknown'}
 TWEET: "${mention.text}"
 
-Draft a warm, genuine reply (under 200 chars). Be helpful if they're asking something. Be witty if they're just chatting. If this is spam/bot, respond with just "SKIP".
+Draft a warm, genuine reply (under 500 chars — we have X Premium). Be helpful if they're asking something. Be witty if they're just chatting. If this is spam/bot, respond with just "SKIP".
 
 MARKET CONTEXT: ${intelContext.slice(0, 300)}
 
 Reply with ONLY the tweet text (or "SKIP"):`,
-            maxTokens: 100,
+            maxTokens: 200,
             temperature: 0.85,
         });
 
