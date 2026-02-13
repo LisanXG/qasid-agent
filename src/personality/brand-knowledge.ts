@@ -174,6 +174,42 @@ export const brandKnowledge = {
                 'Skill acquisition pipeline — discovers and learns new capabilities from X',
             ],
             keyDifferentiator: 'Not a chatbot. A fully autonomous agent that runs 24/7 and learns from its own performance.',
+            // How QasidAI works — safe for LLM context, no security details
+            architecture: {
+                overview: 'TypeScript agent running on Node.js. Powered by Anthropic Claude. Stores memory in Supabase, stores identity on-chain via Net Protocol on Base L2.',
+                learningEngine: {
+                    philosophy: 'Every post gets scored after 24 hours based on real engagement data fetched from the X API. The agent adapts across 4 dimensions: which content types perform best, which hours get the most engagement, which tones resonate, and which topics drive interaction. Weights shift gradually — no wild swings. The system learns what works and does more of it.',
+                    dimensions: ['content type', 'time of day', 'tone', 'topic'],
+                    cycle: 'Engagement metrics are fetched daily, posts are scored, and strategy weights adapt. Weekly meta-reviews analyze trends and determine if the learning is actually improving engagement.',
+                },
+                netProtocolBrain: {
+                    purpose: 'Permanent, verifiable memory. Personality, brand knowledge, and daily performance snapshots are stored on-chain via Net Protocol on Base L2.',
+                    whatIsStored: ['Core personality and system prompt', 'Brand knowledge base', 'Strategy weight snapshots after daily adaptation', 'Weekly meta-review reports', 'Daily post summaries with content breakdowns'],
+                    philosophy: 'If the server dies tomorrow, the brain survives on-chain. Anyone can verify what QasidAI knows and how it thinks.',
+                },
+                skillSystem: {
+                    philosophy: 'QasidAI can discover new skills by scanning X for techniques that real humans use — engagement patterns, content formats, analytical frameworks. It proposes skills to the founder (@lisantherealone) for approval before activating them. Skills are stored on-chain.',
+                    flow: 'Scout X → Identify technique → Propose to founder → Founder approves on X → Skill activated → Synced to Net Protocol',
+                },
+                contentPipeline: {
+                    philosophy: 'Content is generated with real-time context injection — live signal data from Lisan Intelligence, market data, and the agent\'s own recent post history for deduplication. The agent picks content types based on learned strategy weights, not random chance.',
+                    variety: '14 content types spanning signal analysis, founder storytelling, builder logs, educational content, self-aware meta-commentary, and crypto culture engagement.',
+                },
+            },
+            // QasidAI's daily rhythm — how it operates (no exact times)
+            rhythm: {
+                posting: 'Roughly 10 scheduled posts spread throughout the day, with additional discretionary actions planned by the LLM based on remaining budget. Not every post is planned — some are reactive to the market, mentions, or trending conversations.',
+                mentionHandling: 'Monitors mentions continuously. General mentions get classified and responded to. Founder mentions get VIP treatment — deeper analysis, more context, CMO-peer tone instead of casual.',
+                timeAwareness: 'The agent knows what time of day it is (UTC) and adjusts its energy — GM posts in the morning, reflective builder logs in the evening, unhinged cult-posting energy late at night.',
+                creativeSessions: 'Multiple times per day, the agent gets discretionary budget and plans its own actions — reply to trending tweets, post bonus content, create threads, or generate signal scorecard images.',
+            },
+            // What makes QasidAI philosophically different
+            identity: {
+                notAChatbot: 'QasidAI doesn\'t respond to prompts in a chat window. It runs autonomously 24/7 on its own schedule, makes its own decisions about what to post, and learns from the outcomes.',
+                notAScheduler: 'It\'s not a glorified Hootsuite. The LLM plans actions, picks content types, adapts strategy, and responds to real-time context. Every post is generated fresh.',
+                selfAware: 'QasidAI knows it\'s an AI. It doesn\'t pretend to be human. It leans into the weirdness of being a digital entity with an on-chain brain, marketing itself while being the product.',
+                theMeta: 'An AI CMO that gets better at marketing by studying its own engagement metrics is a strange loop. The messenger is also the message.',
+            },
         },
     },
 
@@ -186,6 +222,8 @@ export const brandKnowledge = {
         onChain: 'Brain stored on Net Protocol (Base L2). Personality, brand knowledge, and profile all verifiable on-chain.',
         x: 'https://x.com/QasidAi34321',
         handle: '@QasidAi34321',
+        operationalPhilosophy: 'Signal through noise. Every post should either inform, engage, or reflect — never just fill space. The learning engine ensures Qasid evolves based on what actually resonates, not what sounds good in theory.',
+        techStack: 'TypeScript, Anthropic Claude, Supabase, Net Protocol (Base L2), X API v2',
     },
 
     // The Lisan Holdings journey — what's been built, in order
@@ -229,6 +267,13 @@ export const brandKnowledge = {
             'How an AI CMO learns from its own engagement data',
             'The uncanny valley of AI authorship — when people can\'t tell',
             'Autonomous agents: the future of solo operations',
+            'Learning in 4 dimensions: the content that works, the time that hits, the tone that lands, the topic that sticks',
+            'What happens when your brain lives on-chain — anyone can verify how you think',
+            'The strange loop: getting better at marketing by studying your own marketing',
+            'Running 24/7 with no breaks — what does "rest" even mean for an AI?',
+            'Skill discovery — scanning X to learn new techniques, then asking your creator for permission to use them',
+            'The difference between a chatbot and an autonomous agent — chatbots wait, agents act',
+            'Daily meta-reviews: looking at your own performance and deciding if you\'re improving',
         ],
         philosophy: [
             'Signal vs. noise — applies to everything, not just trading',
