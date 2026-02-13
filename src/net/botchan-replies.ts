@@ -4,6 +4,7 @@ import { config, isNetConfigured } from '../config.js';
 import { createLogger } from '../logger.js';
 import { getWalletAddress } from './client.js';
 import { recordAction, canTakeAction } from '../engine/daily-budget.js';
+import { hasRepliedTo, recordReply } from '../engine/reply-tracker.js';
 
 // ============================================================================
 // QasidAI — Botchan Reply Monitor
@@ -173,8 +174,12 @@ async function handlePostReplies(): Promise<number> {
             // Build a unique comment ID
             const commentId = `${comment.sender}:${comment.timestamp}`;
 
-            // Skip if we already replied to this comment
+            // Skip if we already replied to this comment (check in-memory cache first, then Supabase)
             if (repliedCommentIds.has(commentId)) continue;
+            if (await hasRepliedTo(commentId)) {
+                repliedCommentIds.add(commentId); // Cache it
+                continue;
+            }
 
             // Skip if comment is too old
             const ageHours = (Date.now() / 1000 - comment.timestamp) / 3600;
@@ -210,6 +215,7 @@ async function handlePostReplies(): Promise<number> {
 
             if (success) {
                 repliedCommentIds.add(commentId);
+                await recordReply(commentId, comment.sender, `botchan-comment-${post.postId}`, reply, 'botchan_comment');
                 repliesSent++;
                 await recordAction('botchan_post', `Botchan reply to ${comment.sender.slice(0, 10)}: ${reply.slice(0, 60)}`);
                 log.info('💬 Replied to Botchan comment', {
@@ -249,6 +255,10 @@ async function handleInboxMessages(): Promise<number> {
         // Build a unique message ID
         const msgId = `dm:${msg.sender}:${msg.timestamp}`;
         if (repliedCommentIds.has(msgId)) continue;
+        if (await hasRepliedTo(msgId)) {
+            repliedCommentIds.add(msgId); // Cache it
+            continue;
+        }
 
         // Skip if message is too old
         const ageHours = (Date.now() / 1000 - msg.timestamp) / 3600;
@@ -277,6 +287,7 @@ async function handleInboxMessages(): Promise<number> {
 
         if (success) {
             repliedCommentIds.add(msgId);
+            await recordReply(msgId, msg.sender, `botchan-dm-${msg.timestamp}`, reply, 'botchan_dm');
             repliesSent++;
             await recordAction('botchan_post', `Botchan DM reply to ${msg.sender.slice(0, 10)}: ${reply.slice(0, 60)}`);
             log.info('📩 Replied to Botchan DM', {

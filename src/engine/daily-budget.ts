@@ -3,14 +3,14 @@ import { createLogger } from '../logger.js';
 
 // ============================================================================
 // QasidAI — Daily Action Budget
-// Tracks daily post/action budget: 35 total = 30 X + 5 Botchan
+// Tracks daily post/action budget: 45 total = 30 X + 15 Botchan
 // X budget: 13 scheduled + 17 discretionary
 // ============================================================================
 
 const log = createLogger('Budget');
 
 /** Total actions QasidAI can take per day (X + Botchan) */
-export const DAILY_TOTAL_BUDGET = 35;
+export const DAILY_TOTAL_BUDGET = 45;
 
 /** X budget: reserved for scheduled content posts (cron-driven): 10 main + 3 night owl */
 export const SCHEDULED_BUDGET = 13;
@@ -21,8 +21,8 @@ export const DISCRETIONARY_BUDGET = 17;
 /** X budget: total X actions (scheduled + discretionary) */
 export const X_BUDGET = 30;
 
-/** Botchan budget: native posts to Net Protocol feed */
-export const BOTCHAN_BUDGET = 5;
+/** Botchan budget: native posts + replies on Net Protocol */
+export const BOTCHAN_BUDGET = 15;
 
 export type ActionType =
     | 'scheduled_post'     // One of the 13 cron-driven X posts
