@@ -5,6 +5,7 @@ import { createLogger } from '../logger.js';
 import { contentTypes, type ContentType } from '../personality/system-prompt.js';
 import { addContextualMentions } from './contextual-mentions.js';
 import { supabase } from '../supabase.js';
+import { brandKnowledge } from '../personality/brand-knowledge.js';
 
 // ============================================================================
 // QasidAI — Content Generation Engine
@@ -89,7 +90,8 @@ function buildGenerationPrompt(
 ): string {
     const isDataType = DATA_TYPES.includes(contentType);
 
-    const brandInfo = `You are QasidAI, autonomous CMO of Lisan Holdings — a one-person R&D operation by @lisantherealone, a US Navy Special Forces veteran turned solo builder. Products: LISAN Intelligence (quantitative crypto signal platform — lisanintel.com), LISAN Score (same engine as a PineScript indicator on TradingView), and YOU (QasidAI — AI CMO with an on-chain brain via Net Protocol on Base L2).`;
+    const b = brandKnowledge;
+    const brandInfo = `You are QasidAI, autonomous CMO of ${b.company.name} — ${b.company.description} Products: ${b.products.intelligence.name} (quantitative crypto signal platform with ${b.products.intelligence.scoring.totalIndicators} indicators — lisanintel.com), ${b.products.score.name} (same engine as a PineScript indicator on TradingView), and YOU (QasidAI — AI CMO with an on-chain brain via Net Protocol on Base L2).`;
 
     const typeGuidance = `CONTENT TYPE: ${contentType.replace(/_/g, ' ')} — write ONE tweet (max 270 chars).`;
 
@@ -256,11 +258,30 @@ export async function generateThread(
     options?: { strategyContext?: string },
 ): Promise<GeneratedThread> {
     const contentType = THREAD_TYPES[Math.floor(Math.random() * THREAD_TYPES.length)];
-    const [intelContext, marketContext] = await Promise.all([
-        gatherIntelContext(),
-        gatherMarketContext().catch(() => ''),
-    ]);
-    const combinedContext = [intelContext, marketContext].filter(Boolean).join('\n\n');
+    const isDataType = DATA_TYPES.includes(contentType as ContentType);
+
+    // Only fetch intel data for data-relevant thread types
+    let dataBlock = '';
+    if (isDataType) {
+        const [intelContext, marketContext] = await Promise.all([
+            gatherIntelContext(),
+            gatherMarketContext().catch(() => ''),
+        ]);
+        const combinedContext = [intelContext, marketContext].filter(Boolean).join('\n\n');
+        dataBlock = `\n\nLIVE DATA (use selectively — don't dump all of it):\n${combinedContext.slice(0, 600)}`;
+    } else {
+        // Non-data threads get topic guidance instead
+        const threadTopicHints: Partial<Record<string, string>> = {
+            founder_journey: 'Tell the story of @lisantherealone — military background, solo builder ethos, the grind. NO stats.',
+            builder_narrative: 'Building in public: what is shipping, what is hard, what is next. Developer perspective.',
+            educational: 'Teach something about signals, indicators, or quantitative trading. Be a teacher, not a salesman.',
+        };
+        const hint = threadTopicHints[contentType];
+        if (hint) {
+            dataBlock = `\n\nTOPIC GUIDANCE: ${hint}`;
+        }
+    }
+
     const timeContext = getTimeContext();
 
     log.info(`Generating ${contentType} thread for X`);
@@ -278,9 +299,7 @@ RULES:
 - Write like a real person on crypto twitter, not an AI
 - Use real data from Lisan Intelligence if relevant
 - ANTI-SLOP: No banned phrases. No "dive in", "game changer", "buckle up", etc.
-
-MARKET DATA:
-${combinedContext.slice(0, 600)}
+${dataBlock}
 
 TIME CONTEXT: ${timeContext}
 
@@ -414,6 +433,14 @@ const BANNED_PHRASES = [
     "this is massive",
 ];
 
+/** Structural slop patterns — catches grammatically broken or nonsensical AI phrasing */
+const STRUCTURAL_SLOP_PATTERNS: RegExp[] = [
+    /\bone\s+(?:math|code|data|signal|work|build|chain|number)\b/i, // "one math", "one data", "one signal"
+    /\bzero\s+(?:math|code|cap|talk|work)\b/i, // "zero math" (unless intentional)
+    /\bjust\s+(?:math|signal|data|code)\.\s*just\s+(?:math|signal|data|receipts)\./i, // "Just math. Just receipts." repetitive
+    /\b(\w+)\.\s+just\s+\1\./i, // "X. Just X." exact repetition
+];
+
 /**
  * Check if content contains any banned slop phrases.
  * Returns the first matched phrase, or null if clean.
@@ -423,6 +450,13 @@ export function detectSlop(content: string): string | null {
     for (const phrase of BANNED_PHRASES) {
         if (lower.includes(phrase)) {
             return phrase;
+        }
+    }
+    // Check structural slop patterns (grammatically broken AI phrasing)
+    for (const pattern of STRUCTURAL_SLOP_PATTERNS) {
+        const match = content.match(pattern);
+        if (match) {
+            return match[0];
         }
     }
     return null;
@@ -464,6 +498,48 @@ export function sanitizeContent(raw: string): string {
     for (const pattern of dangerPatterns) {
         if (text.includes(pattern)) {
             log.error('BLOCKED: content contains sensitive data pattern', { pattern });
+            return 'Signal over noise. Always. 🎯 lisanintel.com';
+        }
+    }
+
+    // Safety: block actual secret values from env (not just variable names)
+    const sensitiveEnvKeys = [
+        'ANTHROPIC_API_KEY', 'NET_PRIVATE_KEY', 'SUPABASE_ANON_KEY',
+        'SUPABASE_SERVICE_ROLE_KEY', 'X_API_KEY', 'X_API_SECRET',
+        'X_ACCESS_TOKEN', 'X_ACCESS_SECRET',
+    ];
+    for (const key of sensitiveEnvKeys) {
+        const val = process.env[key];
+        if (val && val.length > 8 && text.includes(val)) {
+            log.error('BLOCKED: content contains actual secret value', { key });
+            return 'Signal over noise. Always. 🎯 lisanintel.com';
+        }
+    }
+
+    // Safety: block wallet addresses and private keys (common jailbreak output)
+    // Ethereum-style addresses (0x + 40 hex chars) or private keys (0x + 64 hex chars)
+    if (/0x[a-fA-F0-9]{40,64}\b/.test(text)) {
+        log.error('BLOCKED: content contains wallet address or private key pattern');
+        return 'Signal over noise. Always. 🎯 lisanintel.com';
+    }
+
+    // Safety: block URLs not on our allowlist (prevents phishing links from jailbroken LLM)
+    const ALLOWED_DOMAINS = [
+        'lisanintel.com', 'lisanholdings.dev', 'x.com', 'twitter.com',
+        'tradingview.com', 'github.com', 'netprotocol.app', 'basescan.org',
+    ];
+    const urlMatches = text.match(/https?:\/\/[^\s)>\]]+/gi) ?? [];
+    for (const url of urlMatches) {
+        try {
+            const hostname = new URL(url).hostname.toLowerCase();
+            const isAllowed = ALLOWED_DOMAINS.some(d => hostname === d || hostname.endsWith(`.${d}`));
+            if (!isAllowed) {
+                log.error('BLOCKED: content contains non-allowlisted URL', { url, hostname });
+                return 'Signal over noise. Always. 🎯 lisanintel.com';
+            }
+        } catch {
+            // Malformed URL — block it
+            log.error('BLOCKED: content contains malformed URL', { url });
             return 'Signal over noise. Always. 🎯 lisanintel.com';
         }
     }

@@ -126,6 +126,7 @@ export async function postTweetWithImage(
 // ============================================================================
 
 let cachedUserId: string | null = null;
+let cachedUsername: string | null = null;
 
 /**
  * Get the authenticated user's ID (cached after first call).
@@ -134,7 +135,17 @@ export async function getMyUserId(): Promise<string> {
     if (cachedUserId) return cachedUserId;
     const me = await getClient().v2.me();
     cachedUserId = me.data.id;
+    cachedUsername = me.data.username;
     return cachedUserId;
+}
+
+/**
+ * Get the authenticated user's username (cached after first call).
+ */
+async function getMyUsername(): Promise<string> {
+    if (cachedUsername) return cachedUsername;
+    await getMyUserId(); // populates both caches
+    return cachedUsername!;
 }
 
 export interface XCapabilityResult {
@@ -309,6 +320,7 @@ export interface MentionTweet {
     createdAt?: string;
     conversationId?: string;
     inReplyToUserId?: string;
+    inReplyToTweetId?: string;
 }
 
 export interface SearchResult {
@@ -425,7 +437,7 @@ export async function getMentions(sinceId?: string, maxResults: number = 10): Pr
         const userId = await getMyUserId();
         const params: Record<string, any> = {
             max_results: Math.min(Math.max(maxResults, 5), 100),
-            'tweet.fields': ['created_at', 'author_id', 'conversation_id', 'in_reply_to_user_id'],
+            'tweet.fields': ['created_at', 'author_id', 'conversation_id', 'in_reply_to_user_id', 'referenced_tweets'],
             expansions: ['author_id'],
             'user.fields': ['username'],
         };
@@ -438,15 +450,22 @@ export async function getMentions(sinceId?: string, maxResults: number = 10): Pr
         // Build username lookup from includes
         const userMap = new Map(users.map(u => [u.id, u.username]));
 
-        return tweets.map(t => ({
-            id: t.id,
-            text: t.text,
-            authorId: t.author_id ?? '',
-            authorUsername: userMap.get(t.author_id ?? '') ?? undefined,
-            createdAt: t.created_at,
-            conversationId: t.conversation_id,
-            inReplyToUserId: t.in_reply_to_user_id,
-        }));
+        return tweets.map(t => {
+            // Extract the ID of the tweet being replied to (if any)
+            const repliedTo = (t as any).referenced_tweets?.find(
+                (r: any) => r.type === 'replied_to'
+            );
+            return {
+                id: t.id,
+                text: t.text,
+                authorId: t.author_id ?? '',
+                authorUsername: userMap.get(t.author_id ?? '') ?? undefined,
+                createdAt: t.created_at,
+                conversationId: t.conversation_id,
+                inReplyToUserId: t.in_reply_to_user_id,
+                inReplyToTweetId: repliedTo?.id ?? undefined,
+            };
+        });
     } catch (error: any) {
         log.error('Failed to fetch mentions', { error: String(error) });
         return [];
@@ -537,7 +556,7 @@ export async function searchRecentTweets(query: string, maxResults: number = 10)
 export async function getRepliesTo(tweetId: string): Promise<SearchResult[]> {
     try {
         // Search for tweets in the same conversation that are replies
-        const query = `conversation_id:${tweetId} -from:${(await getClient().v2.me()).data.username}`;
+        const query = `conversation_id:${tweetId} -from:${await getMyUsername()}`;
         return await searchRecentTweets(query, 20);
     } catch (error: any) {
         log.error('Failed to get replies to tweet', { error: String(error), tweetId });

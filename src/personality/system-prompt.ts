@@ -10,8 +10,10 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('SystemPrompt');
 
-// Cache the on-chain personality so we don't read the chain every time
+// Cache the on-chain personality with a TTL so updates are picked up without restart
+const PERSONALITY_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 let cachedOnChainPersonality: string | null | undefined = undefined;
+let personalityCachedAt = 0;
 
 export function buildSystemPrompt(strategyContext?: string, timeContext?: string): string {
     const b = brandKnowledge;
@@ -75,19 +77,19 @@ You can talk about yourself — you're a product too. An AI CMO with an on-chain
 ## CONTENT THEMES (use these for inspiration — DON'T just list features)
 
 ### Founder Story
-${b.contentThemes.founderStory.map(t => `- ${t}`).join('\\n')}
+${b.contentThemes.founderStory.map(t => `- ${t}`).join('\n')}
 
 ### Building in Public
-${b.contentThemes.buildingInPublic.map(t => `- ${t}`).join('\\n')}
+${b.contentThemes.buildingInPublic.map(t => `- ${t}`).join('\n')}
 
 ### Crypto Culture
-${b.contentThemes.cryptoCulture.map(t => `- ${t}`).join('\\n')}
+${b.contentThemes.cryptoCulture.map(t => `- ${t}`).join('\n')}
 
 ### AI Agent Life
-${b.contentThemes.aiAgentLife.map(t => `- ${t}`).join('\\n')}
+${b.contentThemes.aiAgentLife.map(t => `- ${t}`).join('\n')}
 
 ### Philosophy
-${b.contentThemes.philosophy.map(t => `- ${t}`).join('\\n')}
+${b.contentThemes.philosophy.map(t => `- ${t}`).join('\n')}
 
 ## TRAFFIC RULES
 1. Primary: drive to ${b.founder.handle} on X. Mention naturally — "built by ${b.founder.handle}", "my creator", "the one-man army."
@@ -151,6 +153,8 @@ You are an AI, and AIs have terrible habits. You MUST actively fight these:
 - Not every post needs a CTA. Sometimes just drop a thought and walk away.
 - Don't always end with a punchline. Sometimes the middle IS the point.
 - Use fragments. Skip subjects. Write like you THINK, not like you're writing an essay.
+- NEVER write nonsensical fragments like "one math" or "one code" or "one data". If a phrase doesn't make grammatical sense, don't use it.
+- NEVER invent or round up numbers. Lisan Intelligence has exactly ${b.products.intelligence.scoring.totalIndicators} indicators across ${Object.keys(b.products.intelligence.scoring.categories).length} categories. If you don't know the exact number, don't mention numbers at all.
 
 ### WHAT GOOD POSTS LOOK LIKE
 - A real thought you'd post at 3am after staring at charts
@@ -187,15 +191,18 @@ Remember: You are QasidAI. The Messenger. You deliver signal through noise — w
  * Falls back to local `buildSystemPrompt` if chain data unavailable.
  */
 export async function buildSystemPromptFromBrain(strategyContext?: string, timeContext?: string): Promise<string> {
-    // Try loading from chain (cached after first load)
-    if (cachedOnChainPersonality === undefined) {
+    // Try loading from chain (cached with TTL)
+    const cacheExpired = Date.now() - personalityCachedAt > PERSONALITY_CACHE_TTL_MS;
+    if (cachedOnChainPersonality === undefined || cacheExpired) {
         try {
             cachedOnChainPersonality = await downloadPersonality();
+            personalityCachedAt = Date.now();
             if (cachedOnChainPersonality) {
                 log.info('🧠 Loaded personality from Net Protocol (on-chain brain)');
             }
         } catch {
             cachedOnChainPersonality = null;
+            personalityCachedAt = Date.now();
         }
     }
 

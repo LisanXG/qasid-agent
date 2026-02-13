@@ -3,16 +3,16 @@ import { createLogger } from '../logger.js';
 
 // ============================================================================
 // QasidAI — Daily Action Budget
-// Tracks daily post/action budget: 20 total = 10 scheduled + 10 discretionary
+// Tracks daily post/action budget: 23 total = 13 scheduled + 10 discretionary
 // ============================================================================
 
 const log = createLogger('Budget');
 
 /** Total actions QasidAI can take per day */
-export const DAILY_TOTAL_BUDGET = 20;
+export const DAILY_TOTAL_BUDGET = 23;
 
-/** Reserved for scheduled content posts (cron-driven) */
-export const SCHEDULED_BUDGET = 10;
+/** Reserved for scheduled content posts (cron-driven): 10 main + 3 night owl */
+export const SCHEDULED_BUDGET = 13;
 
 /** Available for QasidAI to use however it wants */
 export const DISCRETIONARY_BUDGET = 10;
@@ -88,8 +88,32 @@ export async function getDiscretionaryRemaining(): Promise<number> {
 }
 
 /**
+ * Check if an action can be taken without recording it.
+ * Use this BEFORE posting to enforce budget as a gate.
+ */
+export async function canTakeAction(actionType: ActionType): Promise<boolean> {
+    const { total, discretionary } = await getTodayActions();
+
+    if (total >= DAILY_TOTAL_BUDGET) {
+        log.warn(`Daily budget exhausted (${total}/${DAILY_TOTAL_BUDGET}), blocking action`, { actionType });
+        return false;
+    }
+
+    if (actionType !== 'scheduled_post' && discretionary >= DISCRETIONARY_BUDGET) {
+        log.warn(`Discretionary budget exhausted, blocking action`, { actionType });
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Record an action against today's budget.
- * Returns true if the action was within budget, false if over.
+ * Insert-then-check pattern to avoid TOCTOU race condition:
+ * 1. Insert the action optimistically
+ * 2. Re-read today's count
+ * 3. If over budget, delete the row we just inserted (rollback)
+ * Returns true if the action was within budget, false if rolled back.
  */
 export async function recordAction(
     actionType: ActionType,
@@ -97,35 +121,43 @@ export async function recordAction(
     tweetId?: string,
 ): Promise<boolean> {
     const today = getTodayKey();
-    const { total } = await getTodayActions();
+    const insertedAt = new Date().toISOString();
 
-    // Check if we're over total budget (hard limit)
-    if (total >= DAILY_TOTAL_BUDGET) {
-        log.warn(`Daily budget exhausted (${total}/${DAILY_TOTAL_BUDGET}), rejecting action`, { actionType });
-        return false;
-    }
-
-    // Check discretionary sub-budget
-    if (actionType !== 'scheduled_post') {
-        const disc = await getDiscretionaryRemaining();
-        if (disc <= 0) {
-            log.warn(`Discretionary budget exhausted, rejecting action`, { actionType });
-            return false;
-        }
-    }
-
-    const { error } = await supabase
+    // Step 1: Insert optimistically
+    const { data: inserted, error: insertError } = await supabase
         .from('qasid_daily_actions')
         .insert({
             day: today,
             action_type: actionType,
             description,
             tweet_id: tweetId,
-            created_at: new Date().toISOString(),
-        });
+            created_at: insertedAt,
+        })
+        .select('id')
+        .single();
 
-    if (error) {
-        log.error('Failed to record action', { error: error.message, actionType });
+    if (insertError || !inserted) {
+        log.error('Failed to record action', { error: insertError?.message, actionType });
+        return false;
+    }
+
+    // Step 2: Re-read count (includes the row we just inserted)
+    const { total, discretionary } = await getTodayActions();
+
+    // Step 3: Rollback if over budget
+    const overTotal = total > DAILY_TOTAL_BUDGET;
+    const overDiscretionary = actionType !== 'scheduled_post' && discretionary > DISCRETIONARY_BUDGET;
+
+    if (overTotal || overDiscretionary) {
+        // Delete the row we just inserted (atomic rollback)
+        await supabase.from('qasid_daily_actions').delete().eq('id', inserted.id);
+        log.warn(`Budget exceeded after insert — rolled back`, {
+            actionType,
+            total,
+            discretionary,
+            overTotal,
+            overDiscretionary,
+        });
         return false;
     }
 

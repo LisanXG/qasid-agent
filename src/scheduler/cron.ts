@@ -15,7 +15,7 @@ import { runTimelineScan } from '../engine/timeline-scanner.js';
 import { runMentionMonitor } from '../engine/mention-monitor.js';
 import { runSmartFollow } from '../engine/smart-follow.js';
 import { runCreativeSession } from '../engine/creative-session.js';
-import { recordAction } from '../engine/daily-budget.js';
+import { recordAction, canTakeAction } from '../engine/daily-budget.js';
 import { generateScorecardImage } from '../engine/scorecard-image.js';
 import { runBotchanContentCycle } from '../net/botchan-content.js';
 import { initializeSkills, syncSkillsToChain } from '../skills/skill-manager.js';
@@ -61,6 +61,13 @@ async function runContentCycle(options?: {
         return;
     }
 
+    // Pre-check budget before generating/posting (enforce budget as a gate)
+    const allowed = await canTakeAction('scheduled_post');
+    if (!allowed) {
+        log.warn('Budget exhausted — skipping content cycle');
+        return;
+    }
+
     // Load current strategy context from learned weights
     const context = options?.strategyContext ?? await getStrategyContext().catch((err) => {
         log.warn('Failed to load strategy context, continuing without it', { error: String(err).slice(0, 200) });
@@ -78,7 +85,7 @@ async function runContentCycle(options?: {
         const duplicate = await wasRecentlyPosted(post.contentType, 'x', 4);
         if (duplicate) {
             log.info(`Skipping ${post.contentType} — recently posted. Retrying with different type.`);
-            const retry = await generatePost({ strategyContext: context });
+            const retry = await generatePost({ strategyContext: context, weights: { [post.contentType]: 0 } });
             const retryDup = await wasRecentlyPosted(retry.contentType, 'x', 4);
             if (retryDup) {
                 log.warn('Still duplicate after retry, skipping this cycle');
@@ -419,6 +426,21 @@ export function startScheduler(): void {
     }, { timezone: 'UTC' });
     activeTasks.push(founderMentions);
     log.info('👑 Founder VIP mention monitor active (every 15 min)');
+
+    // ---- General Mention Monitor (every 30 min) ----
+    const mentionMonitor = cron.schedule('*/30 * * * *', async () => {
+        log.debug('💬 General mention monitor running...');
+        try {
+            const replied = await runMentionMonitor();
+            if (replied > 0) {
+                log.info(`💬 Mention monitor: replied to ${replied} mention(s)`);
+            }
+        } catch (error) {
+            log.error('Mention monitor failed', { error: String(error) });
+        }
+    }, { timezone: 'UTC' });
+    activeTasks.push(mentionMonitor);
+    log.info('💬 General mention monitor active (every 30 min)');
 
     // ---- Skill Scout (2x/day: 10:00 and 22:00 UTC) ----
     const skillScoutAM = cron.schedule('0 10 * * *', async () => {

@@ -26,7 +26,7 @@ const envSchema = z.object({
     // Net Protocol (on-chain brain)
     NET_PRIVATE_KEY: z.string()
         .refine(
-            (v) => v === '' || (v.startsWith('0x') && v.length === 66),
+            (v) => v.startsWith('0x') && v.length === 66,
             'NET_PRIVATE_KEY must start with 0x and be 66 characters (32-byte hex key)'
         )
         .optional(),

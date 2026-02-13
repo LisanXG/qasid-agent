@@ -6,6 +6,7 @@ import { gatherIntelContext } from '../data/intelligence.js';
 import { getDiscretionaryRemaining, recordAction, getBudgetSummary } from './daily-budget.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
+import { sanitizeUserInput } from './sanitize-input.js';
 
 // ============================================================================
 // QasidAI — Creative Session
@@ -22,7 +23,6 @@ const AVAILABLE_ACTIONS = [
     'BONUS_POST — Post extra original content (a thought, hot take, or observation)',
     'THREAD — Post a multi-tweet thread (3-5 tweets) diving deep into a topic',
     'IMAGE_POST — Post a signal scorecard image with live data',
-    'QUOTE_COMMENT — Find a tweet worth quote-commenting on',
     'SKIP — Save the remaining budget (no more actions this session)',
 ];
 
@@ -95,11 +95,11 @@ async function executeReplyTrending(intelContext: string): Promise<boolean> {
     for (const tweet of candidates.slice(0, 3)) {
         if (await hasRepliedTo(tweet.id)) continue;
 
-        // Draft reply via LLM
+        // Draft reply via LLM (sanitize user text to prevent prompt injection)
         const result = await generate({
             prompt: `You found this tweet while browsing crypto twitter:
 
-TWEET by @${tweet.authorUsername ?? 'unknown'}: "${tweet.text}"
+TWEET by @${tweet.authorUsername ?? 'unknown'}: "${sanitizeUserInput(tweet.text)}"
 Likes: ${tweet.metrics?.like_count ?? 0} | Replies: ${tweet.metrics?.reply_count ?? 0}
 
 Draft a sharp, natural reply (under 200 chars). Add value — don't just agree. Reference data from Lisan Intelligence if relevant. If this tweet isn't worth replying to, respond with just "SKIP".
@@ -144,7 +144,7 @@ async function executeReplyMention(intelContext: string): Promise<boolean> {
             prompt: `Someone mentioned you (@QasidAI) on X:
 
 FROM: @${mention.authorUsername ?? 'unknown'}
-TWEET: "${mention.text}"
+TWEET: "${sanitizeUserInput(mention.text)}"
 
 Draft a warm, genuine reply (under 500 chars — we have X Premium). Be helpful if they're asking something. Be witty if they're just chatting. If this is spam/bot, respond with just "SKIP".
 
@@ -346,11 +346,6 @@ Just the action names, one per line. No explanation needed:`,
                     break;
                 case 'IMAGE_POST':
                     success = await executeImagePost();
-                    break;
-                case 'QUOTE_COMMENT':
-                    // Quote tweet is like reply trending but with a different format
-                    // For now, fall through to reply trending
-                    success = await executeReplyTrending(intelContext);
                     break;
             }
             if (success) executed++;

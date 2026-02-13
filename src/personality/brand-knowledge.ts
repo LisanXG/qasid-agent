@@ -79,24 +79,29 @@ export const brandKnowledge = {
             url: 'https://lisanintel.com',
             proofUrl: 'https://lisanintel.com/proof',
             docsUrl: 'https://lisanintel.com/docs',
-            description: 'Quantitative crypto signal platform. Replace gut feelings with math. Free. No paywall. Just signals.',
+            description: 'Quantitative crypto signal platform. 17-indicator scoring engine. Replace gut feelings with math. Free. No paywall.',
             // Technical depth — for when Qasid actually talks about the product
             scoring: {
-                totalIndicators: 14,
+                totalIndicators: 17,
+                totalPoints: 100,
                 categories: {
                     momentum: { indicators: ['RSI', 'StochRSI', 'MACD', 'Williams %R', 'CCI'], maxPoints: 25 },
-                    trend: { indicators: ['EMA Stack', 'Ichimoku Cloud', 'ADX', 'Bollinger Bands'], maxPoints: 25 },
-                    volume: { indicators: ['OBV Trend', 'Volume Ratio'], maxPoints: 20 },
-                    sentiment: { indicators: ['Fear & Greed Index', 'Hyperliquid Funding Rate'], maxPoints: 15 },
+                    trend: { indicators: ['EMA Stack (7/21/50)', 'Ichimoku Cloud', 'ADX', 'Bollinger Bands'], maxPoints: 25 },
+                    volume: { indicators: ['OBV Trend', 'Volume Ratio'], maxPoints: 16 },
+                    volatility: { indicators: ['Z-Score'], maxPoints: 10 },
+                    sentiment: { indicators: ['Fear & Greed Index'], maxPoints: 8 },
+                    positioning: { indicators: ['Funding Rate', 'Open Interest Change', 'Basis Premium', 'HL Volume Momentum'], maxPoints: 16 },
                 },
                 outputs: ['LONG / SHORT / HOLD signal', 'Confidence score (0-100)', 'ATR-based Stop Loss and Take Profit (1:2 R:R)'],
             },
             features: [
-                'Self-learning weight adaptation — system adapts indicator weights based on signal performance',
-                'Market regime detection: BULLISH / BEARISH / NEUTRAL / VOLATILE',
-                'Real-time WebSocket tracking via Hyperliquid',
+                'Self-learning weight adaptation — system adjusts indicator weights after 3 consecutive losses (penalty) or wins (boost)',
+                'Market regime detection: BULL_TREND / BEAR_TREND / HIGH_VOL_CHOP / RECOVERY_PUMP / DISTRIBUTION / ACCUMULATION',
+                'Positioning cluster — live Hyperliquid derivatives data (funding rates, OI, basis premium) as first-class indicators',
+                'Real-time signal tracking via server-side cron, 24/7',
                 '20 curated crypto assets with sufficient liquidity for reliable TA',
                 'Transparency dashboard at /proof with full performance history',
+                'Smart exit strategy — dual-timeframe (1h/4h) momentum re-evaluation at +3% profit',
                 'Shareable signal cards — generate PNGs and share to X',
                 'Quant view with CSV export for institutional workflows',
                 'Watchlist with price tracking',
@@ -114,9 +119,10 @@ export const brandKnowledge = {
             // The engine's philosophy — how to talk about it intelligently
             enginePhilosophy: {
                 goal: 'Replace emotional trading with systematic analysis. Not to predict the future — that\'s impossible. But to identify when probabilities are in your favor.',
-                selfLearning: 'After 3 consecutive losses, the engine identifies which indicators were "confidently wrong" and reduces their weights by up to 15%. After 3 consecutive wins, it boosts high-performing indicators by up to 10%. Bidirectional learning.',
-                regimeDetection: 'Markets don\'t behave the same way all the time. The engine detects current market regime (BULL_TREND, BEAR_TREND, HIGH_VOL_CHOP) and adjusts signal strictness accordingly.',
+                selfLearning: 'After 3 consecutive losses, the engine identifies which indicators were "confidently wrong" and reduces their weights by up to 15%. After 3 consecutive wins, it boosts high-performing indicators by up to 10%. Bidirectional learning with weight recovery toward defaults after 20 clean trades.',
+                regimeDetection: 'Classifies current market into BULL_TREND, BEAR_TREND, HIGH_VOL_CHOP, RECOVERY_PUMP, DISTRIBUTION, or ACCUMULATION. Score thresholds adapt: ~23 in clear trends, ~33 in choppy markets.',
                 smartExit: 'When a trade reaches +3% profit, the engine re-evaluates RSI and MACD on 1h and 4h timeframes. Both confirming? Let it run. Both fading? Take profit. Mixed? Stay in.',
+                positioning: 'v4.1 introduced a full Positioning Cluster — live Hyperliquid data (funding rates, OI changes, basis premium, volume momentum) as first-class weighted indicators. Where the crowd is positioned, crowded trades tend to unwind violently.',
                 whyNotAllCoins: 'Only 20 curated assets. Technical analysis requires liquidity. Low-cap coins with $5M daily volume = noise, not signal. One whale can invalidate your entire analysis.',
                 riskReward: 'At 1:2 R:R, you only need to win 34% of trades to break even. Win 40%? Profitable. Win 50%? Very well.',
                 transparency: 'No cherry-picking. No hiding losses. Every signal ever generated is tracked at /proof.',
@@ -125,7 +131,7 @@ export const brandKnowledge = {
         score: {
             name: 'Lisan Score',
             platform: 'TradingView',
-            description: 'PineScript indicator using the same scoring methodology as lisanintel.com. Native to your TradingView charts.',
+            description: 'PineScript indicator using the same methodology as lisanintel.com. 12 technical indicators. Native to your TradingView charts.',
             // Technical breakdown — the Score is 85% of the web engine
             scoring: {
                 indicators: 12,
@@ -146,11 +152,12 @@ export const brandKnowledge = {
             ],
             // What the web version adds beyond Score
             webExtras: [
-                'Fear & Greed sentiment analysis',
-                'Hyperliquid funding rate integration',
+                'Fear & Greed sentiment cluster',
+                'Hyperliquid Positioning cluster (Funding Rate, Open Interest Change, Basis Premium, HL Volume Momentum)',
                 'Self-learning weight adaptation',
+                'Market regime detection',
             ],
-            coverageVsWeb: '85% of the LISAN Intelligence scoring system',
+            coverageVsWeb: '12 of 17 indicators — web adds Sentiment + Positioning clusters and self-learning',
             keyDifferentiator: 'Free, same engine as the web platform, native to your charts.',
             license: 'Mozilla Public License 2.0',
         },

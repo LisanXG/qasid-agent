@@ -4,6 +4,7 @@ import { gatherIntelContext } from '../data/intelligence.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
 import { config } from '../config.js';
+import { sanitizeUserInput } from './sanitize-input.js';
 
 // ============================================================================
 // QasidAI — Timeline Scanner
@@ -112,7 +113,7 @@ async function evaluateAndDraftReply(
     const prompt = `You found this tweet on X while scanning for engagement opportunities:
 
 TWEET by @${tweet.authorUsername ?? 'unknown'}:
-"${tweet.text}"
+"${sanitizeUserInput(tweet.text)}"
 
 Engagement: ${tweet.metrics?.like_count ?? 0} likes, ${tweet.metrics?.reply_count ?? 0} replies
 

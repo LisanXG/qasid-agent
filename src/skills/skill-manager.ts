@@ -24,6 +24,9 @@ const log = createLogger('Skills');
 const BRAIN_KEY_SKILLS = 'qasid-skills';
 const FOUNDER_HANDLE = 'lisantherealone';
 
+/** Stable epoch for built-in skills (prevents timestamp reset on every deploy) */
+const BUILT_IN_EPOCH = '2025-02-10T00:00:00.000Z';
+
 // ---- Skill Definitions ----
 
 export type SkillStatus = 'active' | 'pending_approval' | 'denied';
@@ -72,7 +75,7 @@ const BUILT_IN_SKILLS: Skill[] = [
         category: 'content',
         source: 'built_in',
         prompt: 'Generate a signal scorecard tweet with the latest data from LISAN Intelligence.',
-        learnedAt: new Date().toISOString(),
+        learnedAt: BUILT_IN_EPOCH,
         usageCount: 0,
         confidence: 1.0,
         status: 'active',
@@ -84,7 +87,7 @@ const BUILT_IN_SKILLS: Skill[] = [
         category: 'content',
         source: 'built_in',
         prompt: 'Write a crypto twitter thread (3-5 tweets) on a topic relevant to our ecosystem.',
-        learnedAt: new Date().toISOString(),
+        learnedAt: BUILT_IN_EPOCH,
         usageCount: 0,
         confidence: 1.0,
         status: 'active',
@@ -96,7 +99,7 @@ const BUILT_IN_SKILLS: Skill[] = [
         category: 'engagement',
         source: 'built_in',
         prompt: 'Find a trending tweet about crypto/AI and draft a sharp, value-adding reply.',
-        learnedAt: new Date().toISOString(),
+        learnedAt: BUILT_IN_EPOCH,
         usageCount: 0,
         confidence: 0.85,
         status: 'active',
@@ -108,7 +111,7 @@ const BUILT_IN_SKILLS: Skill[] = [
         category: 'analysis',
         source: 'built_in',
         prompt: 'Explain the current market regime in plain language. What should traders watch for?',
-        learnedAt: new Date().toISOString(),
+        learnedAt: BUILT_IN_EPOCH,
         usageCount: 0,
         confidence: 0.9,
         status: 'active',
@@ -120,7 +123,7 @@ const BUILT_IN_SKILLS: Skill[] = [
         category: 'meta',
         source: 'built_in',
         prompt: 'Check this text for AI slop patterns and suggest a more natural version.',
-        learnedAt: new Date().toISOString(),
+        learnedAt: BUILT_IN_EPOCH,
         usageCount: 0,
         confidence: 0.95,
         status: 'active',
@@ -217,19 +220,16 @@ export async function recordSkillUsage(skillId: string): Promise<void> {
     const skill = skillRegistry.find(s => s.id === skillId);
     if (!skill || skill.status !== 'active') return;
 
-    skill.usageCount += 1;
-    skill.lastUsed = new Date().toISOString();
-
-    // Confidence decay: if not used in 30+ days, reduce confidence slightly
-    // This prevents stale skills from being over-prioritized
-    if (skill.source !== 'built_in') {
-        const daysSinceLastUse = skill.lastUsed
-            ? (Date.now() - new Date(skill.lastUsed).getTime()) / (1000 * 60 * 60 * 24)
-            : 0;
+    // Check confidence decay BEFORE updating lastUsed (so we see actual time since last use)
+    if (skill.source !== 'built_in' && skill.lastUsed) {
+        const daysSinceLastUse = (Date.now() - new Date(skill.lastUsed).getTime()) / (1000 * 60 * 60 * 24);
         if (daysSinceLastUse > 30) {
             skill.confidence = Math.max(0.3, skill.confidence - 0.05);
         }
     }
+
+    skill.usageCount += 1;
+    skill.lastUsed = new Date().toISOString();
 
     await supabase
         .from('qasid_skills')
