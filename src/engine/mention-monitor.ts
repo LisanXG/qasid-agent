@@ -395,15 +395,17 @@ const FOUNDER_HANDLE = 'lisantherealone';
  * - No randomized throttle
  * - Always replies with contextual, substantive content
  *
+ * Unlike the general monitor, this does NOT use the watermark.
+ * It always scans the 50 most recent mentions and lets hasRespondedTo
+ * handle dedup. This means if a bad reply is deleted from X and its
+ * Supabase record is cleared, Qasid will re-reply on the next cycle.
+ *
  * Returns the number of replies posted.
  */
 export async function runFounderMentionCheck(): Promise<number> {
-    // Get watermark — reuses the same watermark as the general monitor
-    // This is safe because we filter by founder handle only
-    const sinceId = await getLastMentionId();
-
-    // Fetch recent mentions
-    const mentions = await getMentions(sinceId, 20);
+    // Always fetch recent mentions WITHOUT watermark — scan a wide window
+    // so we never miss a founder tag, even older ones
+    const mentions = await getMentions(undefined, 50);
     if (mentions.length === 0) return 0;
 
     // Filter to founder only
@@ -413,7 +415,7 @@ export async function runFounderMentionCheck(): Promise<number> {
 
     if (founderMentions.length === 0) return 0;
 
-    log.info(`👑 Found ${founderMentions.length} founder mention(s) to process`);
+    log.info(`👑 Found ${founderMentions.length} founder mention(s) to check`);
 
     // Fetch intel context once for all replies
     const intelContext = await gatherIntelContext();
@@ -421,7 +423,7 @@ export async function runFounderMentionCheck(): Promise<number> {
     let replied = 0;
 
     for (const mention of founderMentions) {
-        // Skip if already responded
+        // Skip if already responded (check Supabase, not watermark)
         if (await hasRespondedTo(mention.id)) continue;
 
         // Check if this is a skill approval first
@@ -462,14 +464,8 @@ export async function runFounderMentionCheck(): Promise<number> {
         }
     }
 
-    // Update watermark to newest mention (all mentions, not just founder)
-    const highestId = mentions.reduce(
-        (max, m) => (!max || m.id > max ? m.id : max),
-        sinceId,
-    );
-    if (highestId && highestId !== sinceId) {
-        await saveLastMentionId(highestId);
-    }
+    // NOTE: Founder check does NOT update the watermark.
+    // The general mention monitor manages its own watermark independently.
 
     return replied;
 }
