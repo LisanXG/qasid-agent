@@ -21,6 +21,13 @@ import { generateScorecardImage } from '../engine/scorecard-image.js';
 import { runBotchanContentCycle } from '../net/botchan-content.js';
 import { initializeSkills, syncSkillsToChain } from '../skills/skill-manager.js';
 import { runSkillScout } from '../skills/skill-scout.js';
+import { runFounderMonitor } from '../engine/founder-monitor.js';
+import { runWebsiteMonitor } from '../engine/website-monitor.js';
+import { runGitHubMonitor } from '../engine/github-monitor.js';
+import { uploadFullBrain } from '../net/brain.js';
+import { buildSystemPrompt } from '../personality/system-prompt.js';
+import { brandKnowledge } from '../personality/brand-knowledge.js';
+import { loadDynamicKnowledge } from '../engine/dynamic-knowledge.js';
 
 // ============================================================================
 // QasidAI — Content Scheduler
@@ -446,6 +453,68 @@ export function startScheduler(): void {
     activeTasks.push(skillScoutPM);
     log.info('🔍 Skill scout active (2x/day: 10:00 & 22:00 ET)');
 
+    // ---- Founder Tweet Monitor (every 2 hours) ----
+    const founderMonitor = cron.schedule('5 */2 * * *', async () => {
+        log.debug('👁️ Founder monitor running...');
+        try {
+            const facts = await runFounderMonitor();
+            if (facts > 0) {
+                log.info(`👁️ Founder monitor: stored ${facts} new fact(s)`);
+            }
+        } catch (error) {
+            log.error('Founder monitor failed', { error: String(error) });
+        }
+    }, { timezone: 'America/New_York' });
+    activeTasks.push(founderMonitor);
+    log.info('👁️ Founder tweet monitor active (every 2 hours)');
+
+    // ---- Website Monitor (daily at 4:00 AM ET) ----
+    const websiteMonitor = cron.schedule('0 4 * * *', async () => {
+        log.info('🌐 Website monitor running...');
+        try {
+            const facts = await runWebsiteMonitor();
+            log.info(`🌐 Website monitor: ${facts} new fact(s)`);
+        } catch (error) {
+            log.error('Website monitor failed', { error: String(error) });
+        }
+    }, { timezone: 'America/New_York' });
+    activeTasks.push(websiteMonitor);
+    log.info('🌐 Website monitor active (daily 4:00 AM ET)');
+
+    // ---- GitHub Org Monitor (daily at 4:30 AM ET) ----
+    const githubMonitor = cron.schedule('30 4 * * *', async () => {
+        log.info('🐙 GitHub monitor running...');
+        try {
+            const facts = await runGitHubMonitor();
+            log.info(`🐙 GitHub monitor: ${facts} new fact(s)`);
+        } catch (error) {
+            log.error('GitHub monitor failed', { error: String(error) });
+        }
+    }, { timezone: 'America/New_York' });
+    activeTasks.push(githubMonitor);
+    log.info('🐙 GitHub org monitor active (daily 4:30 AM ET)');
+
+    // ---- Auto Brain Sync to Net Protocol (daily at 3:00 AM ET) ----
+    if (isNetConfigured) {
+        const brainSync = cron.schedule('0 3 * * *', async () => {
+            log.info('🧠 Auto brain sync starting...');
+            try {
+                const personality = buildSystemPrompt();
+                const brand = JSON.stringify(brandKnowledge, null, 2);
+                const dynKnowledge = await loadDynamicKnowledge();
+                const fullPersonality = dynKnowledge
+                    ? `${personality}\n\n${dynKnowledge}`
+                    : personality;
+                await uploadFullBrain(fullPersonality, brand);
+                log.info('🧠 Auto brain sync complete');
+            } catch (error) {
+                log.error('Auto brain sync failed', { error: String(error) });
+            }
+        }, { timezone: 'America/New_York' });
+        activeTasks.push(brainSync);
+        log.info('🧠 Auto brain sync active (daily 3:00 AM ET)');
+    }
+
     // ---- Botchan Reply Monitor (every 30 min) ----
     if (isNetConfigured) {
         const botchanReplies = cron.schedule('*/30 * * * *', async () => {
@@ -492,3 +561,10 @@ export async function runOnceWithBotchan(): Promise<void> {
     log.info('Manual run for Botchan');
     await runBotchanContentCycle();
 }
+
+/**
+ * Run a single knowledge sync cycle manually (for testing).
+ */
+export { runFounderMonitor } from '../engine/founder-monitor.js';
+export { runWebsiteMonitor } from '../engine/website-monitor.js';
+export { runGitHubMonitor } from '../engine/github-monitor.js';

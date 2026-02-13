@@ -1,5 +1,6 @@
 import { brandKnowledge } from './brand-knowledge.js';
 import { downloadPersonality } from '../net/brain.js';
+import { loadDynamicKnowledge } from '../engine/dynamic-knowledge.js';
 import { createLogger } from '../logger.js';
 
 // ============================================================================
@@ -206,7 +207,10 @@ export async function buildSystemPromptFromBrain(strategyContext?: string, timeC
         }
     }
 
-    // If we have an on-chain personality, use it (append strategy + time context)
+    // Load runtime-learned facts from dynamic knowledge layer
+    const dynamicKnowledge = await loadDynamicKnowledge();
+
+    // If we have an on-chain personality, use it (append strategy + time + dynamic knowledge)
     if (cachedOnChainPersonality) {
         let base = cachedOnChainPersonality;
         if (timeContext) {
@@ -215,11 +219,18 @@ export async function buildSystemPromptFromBrain(strategyContext?: string, timeC
         if (strategyContext) {
             base += `\n\n## CURRENT STRATEGY (from learning engine)\n${strategyContext}`;
         }
+        if (dynamicKnowledge) {
+            base += `\n\n${dynamicKnowledge}`;
+        }
         return base;
     }
 
-    // Fallback to local
-    return buildSystemPrompt(strategyContext, timeContext);
+    // Fallback to local (also inject dynamic knowledge)
+    let prompt = buildSystemPrompt(strategyContext, timeContext);
+    if (dynamicKnowledge) {
+        prompt += `\n\n${dynamicKnowledge}`;
+    }
+    return prompt;
 }
 
 export const contentTypes = [

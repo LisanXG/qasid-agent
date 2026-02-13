@@ -563,3 +563,36 @@ export async function getRepliesTo(tweetId: string): Promise<SearchResult[]> {
         return [];
     }
 }
+
+/**
+ * Fetch recent tweets from a specific user by handle.
+ * Used by the founder monitor to passively watch @Lisantherealone.
+ * Returns null if API access is insufficient (Free tier).
+ */
+export async function getFounderTweets(handle: string = 'lisantherealone', count: number = 20): Promise<{ id: string; text: string }[] | null> {
+    try {
+        // First, look up the user ID from handle
+        const user = await getClient().v2.userByUsername(handle);
+        if (!user.data?.id) {
+            log.warn('Could not find user by handle', { handle });
+            return null;
+        }
+
+        const timeline = await getClient().v2.userTimeline(user.data.id, {
+            max_results: count,
+            'tweet.fields': ['created_at', 'text'],
+            exclude: ['retweets'],
+        });
+
+        const tweets = timeline.data?.data ?? [];
+        return tweets.map(t => ({ id: t.id, text: t.text ?? '' }));
+    } catch (error: any) {
+        const msg = String(error);
+        if (msg.includes('403') || msg.includes('Forbidden')) {
+            log.debug('Founder tweets API not available (likely Free tier), fallback to syndication');
+            return null;
+        }
+        log.warn('Failed to fetch founder tweets via API', { error: msg.slice(0, 150) });
+        return null;
+    }
+}

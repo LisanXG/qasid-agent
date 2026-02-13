@@ -3,6 +3,7 @@ import { sanitizeContent } from './content.js';
 import { getMentions, replyToTweet, getTweetById, type MentionTweet } from '../platforms/x.js';
 import { gatherIntelContext } from '../data/intelligence.js';
 import { hasRepliedTo, recordReply, getLastMentionId, saveLastMentionId } from './reply-tracker.js';
+import { addKnowledge, deactivateByKeyword } from './dynamic-knowledge.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
 import { processSkillApproval, discoverSkillFromContent } from '../skills/skill-manager.js';
@@ -488,6 +489,39 @@ export async function runFounderMentionCheck(): Promise<number> {
             } catch {
                 // Not a skill approval — continue to normal reply
             }
+        }
+
+        // Check if this is a knowledge instruction (remember/update/forget)
+        const instructionMatch = mention.text.match(
+            /@\w+\s+(remember|update|forget)\s*:\s*(.+)/is,
+        );
+        if (instructionMatch) {
+            const command = instructionMatch[1].toLowerCase() as 'remember' | 'update' | 'forget';
+            const payload = instructionMatch[2].trim();
+
+            let ack: string;
+            if (command === 'forget') {
+                const count = await deactivateByKeyword(payload);
+                ack = count > 0
+                    ? `Wiped ${count} fact(s) matching "${payload.slice(0, 30)}". Moving on. 🫡`
+                    : `Nothing matching "${payload.slice(0, 30)}" in memory. We're clean.`;
+            } else {
+                // remember or update — store the fact
+                const stored = await addKnowledge(payload, 'founder_instruction',
+                    `https://x.com/${FOUNDER_HANDLE}/status/${mention.id}`);
+                ack = stored
+                    ? `Got it, boss. I'll remember that. 🧠`
+                    : `Already knew that one. We're good. 🫡`;
+            }
+
+            const ackId = await replyToTweet(mention.id, ack);
+            if (ackId) {
+                await recordReply(mention.id, FOUNDER_HANDLE, ackId, ack, 'founder_vip');
+                processedFounderMentionIds.add(mention.id);
+                replied++;
+                log.info('👑 Processed founder instruction', { command, payload: payload.slice(0, 80) });
+            }
+            continue;
         }
 
         // Draft a contextual response (founder-specific analytical prompt)

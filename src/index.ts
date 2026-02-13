@@ -127,6 +127,31 @@ async function main() {
         process.exit(0);
     }
 
+    if (args[0] === 'knowledge-sync') {
+        // Manually trigger all knowledge monitors
+        const { runFounderMonitor } = await import('./engine/founder-monitor.js');
+        const { runWebsiteMonitor } = await import('./engine/website-monitor.js');
+        const { runGitHubMonitor } = await import('./engine/github-monitor.js');
+
+        console.log('\n🔄 Running all knowledge monitors...\n');
+
+        console.log('👁️  Founder tweet monitor...');
+        const founderFacts = await runFounderMonitor();
+        console.log(`   → ${founderFacts} fact(s) stored\n`);
+
+        console.log('🌐 Website monitor...');
+        const webFacts = await runWebsiteMonitor();
+        console.log(`   → ${webFacts} fact(s) stored\n`);
+
+        console.log('🐙 GitHub monitor...');
+        const ghFacts = await runGitHubMonitor();
+        console.log(`   → ${ghFacts} fact(s) stored\n`);
+
+        const total = founderFacts + webFacts + ghFacts;
+        console.log(`✅ Knowledge sync complete: ${total} total fact(s) stored`);
+        process.exit(0);
+    }
+
     if (args[0] === 'net-upload') {
         // Upload QasidAI's full brain to Net Protocol
         if (!isNetConfigured) {
