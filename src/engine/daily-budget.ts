@@ -12,11 +12,11 @@ const log = createLogger('Budget');
 /** Total actions QasidAI can take per day (X + Botchan) */
 export const DAILY_TOTAL_BUDGET = 45;
 
-/** X budget: reserved for scheduled content posts (cron-driven): 10 main + 3 night owl */
-export const SCHEDULED_BUDGET = 13;
+/** X budget: reserved for scheduled content posts (cron-driven): 10 posts */
+export const SCHEDULED_BUDGET = 10;
 
-/** X budget: available for QasidAI to use however it wants */
-export const DISCRETIONARY_BUDGET = 17;
+/** X budget: available for replies and discretionary actions */
+export const DISCRETIONARY_BUDGET = 20;
 
 /** X budget: total X actions (scheduled + discretionary) */
 export const X_BUDGET = 30;

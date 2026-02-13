@@ -31,30 +31,11 @@ const log = createLogger('Scheduler');
 
 const activeTasks: cron.ScheduledTask[] = [];
 
-/** Map content type to a Botchan feed topic */
-function contentTypeToBotchanTopic(contentType: string): string {
-    const topicMap: Record<string, string> = {
-        signal_scorecard: 'trading',
-        win_streak: 'trading',
-        market_regime: 'trading',
-        educational: 'trading',
-        builder_narrative: 'agent-finance',
-        countdown_tease: 'agent-finance',
-        social_proof: 'agent-finance',
-        challenge: 'lisan-holdings',
-        engagement_bait: 'lisan-holdings',
-        cross_platform: 'lisan-holdings',
-    };
-    return topicMap[contentType] || 'lisan-holdings';
-}
-
 /**
  * Run a single content cycle: generate + post to X + save to memory.
- * @param options.crossPostToBotchan If true, also post to Botchan feed (once/day to save gas)
  */
 async function runContentCycle(options?: {
     strategyContext?: string;
-    crossPostToBotchan?: boolean;
     preferredContentType?: string;
 }): Promise<void> {
     if (!isXConfigured) {
@@ -100,13 +81,6 @@ async function runContentCycle(options?: {
             }
             const externalId = await postTweet(retry.content);
             await savePost(retry, externalId ?? undefined);
-            // Cross-post to Botchan if enabled
-            if (options?.crossPostToBotchan && isNetConfigured) {
-                const topic = contentTypeToBotchanTopic(retry.contentType);
-                await postToFeed(retry.content, topic).catch(e =>
-                    log.warn('Botchan cross-post failed (non-blocking)', { error: String(e).slice(0, 200) })
-                );
-            }
             return;
         }
 
@@ -123,15 +97,7 @@ async function runContentCycle(options?: {
         // Save to memory
         await savePost(post, externalId ?? undefined);
 
-        // Cross-post to Botchan feed if enabled (budget: ~$0.001 gas per post)
-        if (options?.crossPostToBotchan && isNetConfigured) {
-            const topic = contentTypeToBotchanTopic(post.contentType);
-            await postToFeed(post.content, topic).catch(e =>
-                log.warn('Botchan cross-post failed (non-blocking)', { error: String(e).slice(0, 200) })
-            );
-        }
-
-        log.info(`✅ Content cycle complete: ${post.contentType} → X${options?.crossPostToBotchan ? ' + Botchan' : ''}`, {
+        log.info(`✅ Content cycle complete: ${post.contentType} → X`, {
             contentLength: post.content.length,
         });
     } catch (error) {
@@ -173,10 +139,10 @@ export function startScheduler(): void {
 
     // ---- 10 Content Cycles / Day ----
 
-    // 06:00 ET — 🌅 GM post (+ Botchan cross-post)
+    // 06:00 ET — 🌅 GM post
     const gm = cron.schedule('0 6 * * *', async () => {
-        log.info('🌅 GM cycle starting (+ Botchan cross-post)');
-        await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'gm_post' });
+        log.info('🌅 GM cycle starting');
+        await runContentCycle({ preferredContentType: 'gm_post' });
     }, { timezone: 'America/New_York' });
     activeTasks.push(gm);
 
@@ -207,10 +173,10 @@ export function startScheduler(): void {
     }, { timezone: 'America/New_York' });
     activeTasks.push(marketData);
 
-    // 10:00 ET — 🧱 Builder narrative / founder journey (+ Botchan)
+    // 10:00 ET — 🧱 Builder narrative / founder journey
     const builder = cron.schedule('0 10 * * *', async () => {
-        log.info('🧱 Builder narrative cycle starting (+ Botchan)');
-        await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'builder_narrative' });
+        log.info('🧱 Builder narrative cycle starting');
+        await runContentCycle({ preferredContentType: 'builder_narrative' });
     }, { timezone: 'America/New_York' });
     activeTasks.push(builder);
 
@@ -221,10 +187,10 @@ export function startScheduler(): void {
     }, { timezone: 'America/New_York' });
     activeTasks.push(educational);
 
-    // 14:00 ET — 🔥 Engagement / hot take (+ Botchan)
+    // 14:00 ET — 🔥 Engagement / hot take
     const engagement = cron.schedule('0 14 * * *', async () => {
-        log.info('🔥 Engagement cycle starting (+ Botchan)');
-        await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'engagement_bait' });
+        log.info('🔥 Engagement cycle starting');
+        await runContentCycle({ preferredContentType: 'engagement_bait' });
     }, { timezone: 'America/New_York' });
     activeTasks.push(engagement);
 
@@ -235,10 +201,10 @@ export function startScheduler(): void {
     }, { timezone: 'America/New_York' });
     activeTasks.push(product);
 
-    // 18:00 ET — 🤖 Self-aware / meta AI (+ Botchan)
+    // 18:00 ET — 🤖 Self-aware / meta AI
     const selfAware = cron.schedule('0 18 * * *', async () => {
-        log.info('🤖 Self-aware cycle starting (+ Botchan)');
-        await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'self_aware' });
+        log.info('🤖 Self-aware cycle starting');
+        await runContentCycle({ preferredContentType: 'self_aware' });
     }, { timezone: 'America/New_York' });
     activeTasks.push(selfAware);
 
@@ -249,10 +215,10 @@ export function startScheduler(): void {
     }, { timezone: 'America/New_York' });
     activeTasks.push(performance);
 
-    // 22:00 ET — 🧠 Engagement bait / cult vibes (+ Botchan)
+    // 22:00 ET — 🧠 Engagement bait / cult vibes
     const lateEngagement = cron.schedule('0 22 * * *', async () => {
-        log.info('🧠 Late engagement cycle starting (+ Botchan)');
-        await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'founder_journey' });
+        log.info('🧠 Late engagement cycle starting');
+        await runContentCycle({ preferredContentType: 'founder_journey' });
     }, { timezone: 'America/New_York' });
     activeTasks.push(lateEngagement);
 
@@ -263,33 +229,9 @@ export function startScheduler(): void {
     }, { timezone: 'America/New_York' });
     activeTasks.push(evening);
 
-    // ---- Overnight Posts (fills the 23:30 → 06:00 dead zone) ----
+    // ---- Creative Sessions (LLM-driven discretionary/reply budget) ----
 
-    // 1:30 ET — 🌃 Late night founder reflection
-    const nightOwl1 = cron.schedule('30 1 * * *', async () => {
-        log.info('🌃 Night owl cycle 1 — founder reflection');
-        await runContentCycle({ preferredContentType: 'founder_journey' });
-    }, { timezone: 'America/New_York' });
-    activeTasks.push(nightOwl1);
-
-    // 3:30 ET — 🌃 Late night market alpha
-    const nightOwl2 = cron.schedule('30 3 * * *', async () => {
-        log.info('🌃 Night owl cycle 2 — market alpha');
-        await runContentCycle({ preferredContentType: 'market_regime' });
-    }, { timezone: 'America/New_York' });
-    activeTasks.push(nightOwl2);
-
-    // 5:30 ET — 🌃 Pre-dawn builder narrative
-    const nightOwl3 = cron.schedule('30 5 * * *', async () => {
-        log.info('🌃 Night owl cycle 3 — builder narrative');
-        await runContentCycle({ preferredContentType: 'builder_narrative' });
-    }, { timezone: 'America/New_York' });
-    activeTasks.push(nightOwl3);
-    log.info('🌃 Night owl posts active (1:30, 3:30, 5:30 ET — reflective content)');
-
-    // ---- Creative Sessions (LLM-driven discretionary budget) ----
-
-    // 4 creative sessions per day — QasidAI decides what to do
+    // 4 creative sessions per day — QasidAI decides what to do (reply, thread, quote, bonus)
     const creative = cron.schedule('30 9,13,17,21 * * *', async () => {
         log.info('🎨 Creative session starting (QasidAI decides what to do)');
         try {
@@ -300,13 +242,25 @@ export function startScheduler(): void {
         }
     }, { timezone: 'America/New_York' });
     activeTasks.push(creative);
-    log.info('🎨 Creative sessions active (9:30, 13:30, 17:30, 21:30 ET — QasidAI decides)');
+    log.info('🎨 Creative sessions active (9:30, 13:30, 17:30, 21:30 ET — reply budget)');
 
-    // ---- Botchan Native Content (unique posts for Net Protocol) ----
+    // ---- Botchan Native Content (5 unique posts for Net Protocol) ----
+
+    // 9:00 ET — Botchan ecosystem insight or agent capability
+    const botchanEarlyMorning = cron.schedule('0 9 * * *', async () => {
+        log.info('⛓️ Botchan native content: ecosystem/capability post');
+        try {
+            const type = Math.random() > 0.5 ? 'ecosystem_insight' : 'agent_capability';
+            await runBotchanContentCycle(type as any);
+        } catch (error) {
+            log.error('Botchan early morning post failed', { error: String(error) });
+        }
+    }, { timezone: 'America/New_York' });
+    activeTasks.push(botchanEarlyMorning);
 
     // 11:00 ET — Botchan market analysis or signal breakdown
     const botchanMorning = cron.schedule('0 11 * * *', async () => {
-        log.info('🤖 Botchan native content: market/signal post');
+        log.info('⛓️ Botchan native content: market/signal post');
         try {
             const type = Math.random() > 0.5 ? 'market_deep_dive' : 'signal_breakdown';
             await runBotchanContentCycle(type as any);
@@ -318,7 +272,7 @@ export function startScheduler(): void {
 
     // 15:00 ET — Botchan net reflection / on-chain brain activity
     const botchanAfternoon = cron.schedule('0 15 * * *', async () => {
-        log.info('🤖 Botchan native content: net reflection / on-chain activity');
+        log.info('⛓️ Botchan native content: net reflection / on-chain activity');
         try {
             const types = ['net_reflection', 'tool_spotlight', 'agent_capability'];
             const type = types[Math.floor(Math.random() * types.length)];
@@ -331,7 +285,7 @@ export function startScheduler(): void {
 
     // 19:00 ET — Botchan builder log, capability share, or GitHub share
     const botchanEvening = cron.schedule('0 19 * * *', async () => {
-        log.info('🤖 Botchan native content: builder/capability post');
+        log.info('⛓️ Botchan native content: builder/capability post');
         try {
             const types = ['builder_log', 'agent_capability', 'github_share', 'tool_spotlight'];
             const type = types[Math.floor(Math.random() * types.length)];
@@ -341,7 +295,19 @@ export function startScheduler(): void {
         }
     }, { timezone: 'America/New_York' });
     activeTasks.push(botchanEvening);
-    log.info('🤖 Botchan native content active (11:00, 15:00, 19:00 ET)');
+
+    // 21:00 ET — Botchan market wrap or builder log
+    const botchanNight = cron.schedule('0 21 * * *', async () => {
+        log.info('⛓️ Botchan native content: market wrap / builder log');
+        try {
+            const type = Math.random() > 0.5 ? 'market_deep_dive' : 'builder_log';
+            await runBotchanContentCycle(type as any);
+        } catch (error) {
+            log.error('Botchan night post failed', { error: String(error) });
+        }
+    }, { timezone: 'America/New_York' });
+    activeTasks.push(botchanNight);
+    log.info('⛓️  Botchan native content active (9:00, 11:00, 15:00, 19:00, 21:00 ET)');
 
     // Daily at 0:30 AM ET — Fetch engagement metrics from X API
     const engagementFetch = cron.schedule('30 0 * * *', async () => {
@@ -424,9 +390,7 @@ export function startScheduler(): void {
         log.info('📝 Daily summary cron active (11:55 PM ET → Net Protocol)');
     }
 
-    if (isNetConfigured) {
-        log.info('⛓️  Botchan cross-post active (GM + builder + engagement + self-aware cycles)');
-    }
+
 
     // ---- Founder VIP Mention Monitor (every 15 min) ----
     const founderMentions = cron.schedule('*/15 * * * *', async () => {
@@ -499,7 +463,7 @@ export function startScheduler(): void {
         log.info('📨 Botchan reply monitor active (every 30 min)');
     }
 
-    log.info(`Scheduler started with ${activeTasks.length} cron jobs (13 posts/day + founder monitor + skill scout + botchan replies)`);
+    log.info(`Scheduler started with ${activeTasks.length} cron jobs (10 X posts + 5 Botchan posts + 20 reply budget + monitors)`);
 }
 
 /**
@@ -522,9 +486,9 @@ export async function runOnce(): Promise<void> {
 }
 
 /**
- * Run a single content cycle with Botchan cross-post (for testing).
+ * Run a single Botchan content cycle manually (for testing).
  */
 export async function runOnceWithBotchan(): Promise<void> {
-    log.info('Manual run for X + Botchan');
-    await runContentCycle({ crossPostToBotchan: true });
+    log.info('Manual run for Botchan');
+    await runBotchanContentCycle();
 }
