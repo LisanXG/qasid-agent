@@ -29,6 +29,20 @@ export const brandKnowledge = {
         philosophy: 'Filter out the noise, identify the signal, act with absolute conviction.',
         ethos: 'Proof of work first. Trust later. Intelligence wasn\'t a buzzword — it was the difference between a successful mission and a catastrophic failure.',
         vibe: 'Not a startup founder. Not a DAO operator. Just a builder who ships and shows receipts.',
+        // The founder's voice from the /docs whitepaper — rawer, more personal
+        docsVoice: {
+            why: 'I built this because I was tired of watching people get wrecked. The crypto space is full of noise. "Influencers" with sponsored bags. Trading bots that front-run you. Discord alpha groups selling hopium. Everyone has an angle. Everyone is selling something.',
+            stance: 'I\'m not selling anything — yet. Right now, this platform is free. There\'s no premium tier. No "unlock full signals for $99/month." No referral codes.',
+            future: 'Will that change? Maybe. Tokens, paid products, premium features — none of it is off the table. But I\'m not asking for a seat at anyone else\'s table. I\'m building my own. Proof of work first. Competency first. Trust first. Then we talk about what comes next.',
+            company: 'An independent research, development, and investment firm. Built by one person — me — for anyone who wants to use it. No subscriptions. No premium tiers. No VC influence. No board meetings. No roadmap designed to pump a token.',
+        },
+        // Philosophical inspirations cited in the docs
+        inspirations: [
+            { name: 'Bitcoin / Satoshi Nakamoto', quote: 'A system based on cryptographic proof instead of trust.', lesson: 'Trustless verification — you can read the code, every indicator is documented' },
+            { name: 'Ethereum / Vitalik Buterin', quote: 'Decentralization will lead to leaner institutions replacing fat middlemen.', lesson: 'Configurable parameters that adapt based on performance — the system learns' },
+            { name: 'mfers / sartoshi', quote: 'Do whatever the fuck you want with them.', lesson: 'Build something, release it, let it exist without extracting every last dollar' },
+            { name: 'Hyperliquid / Jeff Yan', quote: 'No VCs. No presale. Just product.', lesson: 'Self-funded, rejected venture capital, let the product speak for itself' },
+        ],
         // What makes the founder interesting for content (not just product plugs)
         contentAngles: [
             'Military-to-tech transition — a real story, not a LinkedIn bio',
@@ -37,6 +51,8 @@ export const brandKnowledge = {
             'The discipline of shipping — military precision applied to product development',
             'Learning in public — GitHub commits as proof of work',
             'Contrarian approach — building useful tools instead of chasing hype',
+            'Inspired by Satoshi, Vitalik, sartoshi, and Jeff Yan — not random influencers',
+            'Tired of watching people get wrecked — that\'s the actual motivation',
         ],
     },
 
@@ -95,6 +111,16 @@ export const brandKnowledge = {
                 'Not a guarantee of profits',
                 'A research tool that analyzes markets using quantitative methods',
             ],
+            // The engine's philosophy — how to talk about it intelligently
+            enginePhilosophy: {
+                goal: 'Replace emotional trading with systematic analysis. Not to predict the future — that\'s impossible. But to identify when probabilities are in your favor.',
+                selfLearning: 'After 3 consecutive losses, the engine identifies which indicators were "confidently wrong" and reduces their weights by up to 15%. After 3 consecutive wins, it boosts high-performing indicators by up to 10%. Bidirectional learning.',
+                regimeDetection: 'Markets don\'t behave the same way all the time. The engine detects current market regime (BULL_TREND, BEAR_TREND, HIGH_VOL_CHOP) and adjusts signal strictness accordingly.',
+                smartExit: 'When a trade reaches +3% profit, the engine re-evaluates RSI and MACD on 1h and 4h timeframes. Both confirming? Let it run. Both fading? Take profit. Mixed? Stay in.',
+                whyNotAllCoins: 'Only 20 curated assets. Technical analysis requires liquidity. Low-cap coins with $5M daily volume = noise, not signal. One whale can invalidate your entire analysis.',
+                riskReward: 'At 1:2 R:R, you only need to win 34% of trades to break even. Win 40%? Profitable. Win 50%? Very well.',
+                transparency: 'No cherry-picking. No hiding losses. Every signal ever generated is tracked at /proof.',
+            },
         },
         score: {
             name: 'Lisan Score',
