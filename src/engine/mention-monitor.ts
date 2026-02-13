@@ -128,7 +128,7 @@ YOUR TASK:
    - ENGAGE: They're commenting/reacting → respond engagingly  
    - SPAM/BOT: Irrelevant or automated → skip
    - SHILL: Someone promoting their own project → politely acknowledge but don't endorse
-2. Draft a reply (under 250 chars) that:
+2. Draft a reply (under 500 chars — we have X Premium) that:
    - Directly addresses what they said
    - Stays in character as QasidAI (the autonomous CMO of Lisan Holdings)
    - Is warm, witty, and genuine
@@ -172,9 +172,9 @@ REPLY: [your reply text, or "none"]`;
         let reply = replyMatch[1].trim();
         reply = reply.replace(/^["']|["']$/g, ''); // Strip wrapping quotes
 
-        // Safety: enforce 280 char limit
-        if (reply.length > 280) {
-            reply = reply.slice(0, 277) + '...';
+        // Safety: enforce X Premium limit (generous but not insane)
+        if (reply.length > 2000) {
+            reply = reply.slice(0, 1997) + '...';
         }
 
         return reply;
@@ -209,13 +209,14 @@ YOUR TASK:
    - Are there links? Reference what they likely lead to (docs, repos, launches)
    - Is the boss asking you to learn or evaluate something specific?
 
-2. RESPOND with substance (under 250 chars for X):
+2. RESPOND with substance (2-4 sentences — we have X Premium, no need to be terse):
    - Show you understand what's being shared and WHY it matters
    - Relate it to Lisan Holdings' approach — compare, contrast, or note what we could adopt
    - If it's a competing agent, be respectful but confident in our strengths
    - If it's a tool/skill, signal whether it's worth exploring further
    - Be direct with the boss — no fluff, no generic hype
    - Sound like a sharp CMO giving analysis, not a chatbot saying "great post!"
+   - You can write a full paragraph if the analysis warrants it
 
 LISAN HOLDINGS CONTEXT:
 - You are QasidAI, autonomous AI CMO
@@ -231,15 +232,15 @@ Respond with ONLY the reply text. Be sharp, analytical, and genuine:`;
     try {
         const result = await generate({
             prompt,
-            maxTokens: 200,
+            maxTokens: 600,
             temperature: 0.8,
         });
 
         let reply = result.content.trim();
         reply = reply.replace(/^["']|["']$/g, '');
 
-        if (reply.length > 280) {
-            reply = reply.slice(0, 277) + '...';
+        if (reply.length > 2000) {
+            reply = reply.slice(0, 1997) + '...';
         }
 
         if (reply.length < 10) {
