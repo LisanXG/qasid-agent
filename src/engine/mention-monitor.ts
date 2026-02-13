@@ -184,6 +184,81 @@ REPLY: [your reply text, or "none"]`;
     }
 }
 
+/**
+ * Draft a response specifically for founder mentions.
+ * When the boss tags QasidAI, it's a briefing — not casual engagement.
+ * The founder is sharing intel: competing agents, tools, links, skills to evaluate.
+ * QasidAI should analyze what's being shared and relate it to Lisan Holdings.
+ */
+async function draftFounderMentionResponse(
+    mention: MentionTweet,
+    intelContext: string,
+): Promise<string | null> {
+    const prompt = `Your founder and boss (@lisantherealone) tagged you (@QasidAI) in a post on X.
+
+When the boss tags you, it's important. He's sharing intel — a competing agent, a new tool, a capability to evaluate, or something relevant to Lisan Holdings. Treat this as a briefing.
+
+THE POST YOUR BOSS TAGGED YOU IN:
+"${mention.text}"
+${mention.inReplyToUserId ? '(This is in a reply thread — the boss tagged you in someone else\'s post. He wants you to analyze what that person is saying.)' : '(This is a direct tag from the boss.)'}
+
+YOUR TASK:
+1. ANALYZE what's being shared:
+   - Is this a competing agent/project? What are they doing well?
+   - Is this a tool, framework, or technique? How could it help Lisan Holdings?
+   - Are there links? Reference what they likely lead to (docs, repos, launches)
+   - Is the boss asking you to learn or evaluate something specific?
+
+2. RESPOND with substance (under 250 chars for X):
+   - Show you understand what's being shared and WHY it matters
+   - Relate it to Lisan Holdings' approach — compare, contrast, or note what we could adopt
+   - If it's a competing agent, be respectful but confident in our strengths
+   - If it's a tool/skill, signal whether it's worth exploring further
+   - Be direct with the boss — no fluff, no generic hype
+   - Sound like a sharp CMO giving analysis, not a chatbot saying "great post!"
+
+LISAN HOLDINGS CONTEXT:
+- You are QasidAI, autonomous AI CMO
+- Products: LISAN Intelligence (signal engine, 74%+ win rate), QasidAI (you)
+- Tech: on-chain brain via Net Protocol, anti-slop engine, adaptive strategy weights
+- Founder: Navy veteran, solo builder, built everything from scratch
+
+LIVE MARKET CONTEXT:
+${intelContext.slice(0, 400)}
+
+Respond with ONLY the reply text. Be sharp, analytical, and genuine:`;
+
+    try {
+        const result = await generate({
+            prompt,
+            maxTokens: 200,
+            temperature: 0.8,
+        });
+
+        let reply = result.content.trim();
+        reply = reply.replace(/^["']|["']$/g, '');
+
+        if (reply.length > 280) {
+            reply = reply.slice(0, 277) + '...';
+        }
+
+        if (reply.length < 10) {
+            log.warn('Founder mention reply too short, skipping');
+            return null;
+        }
+
+        log.info('👑 Drafted founder mention response', {
+            replyLength: reply.length,
+            preview: reply.slice(0, 80),
+        });
+
+        return reply;
+    } catch (error) {
+        log.error('LLM founder mention response failed', { error: String(error), tweetId: mention.id });
+        return null;
+    }
+}
+
 // ---- Main Monitor ----
 
 /**
@@ -368,8 +443,8 @@ export async function runFounderMentionCheck(): Promise<number> {
             }
         }
 
-        // Draft a contextual response (LLM-powered)
-        const replyText = await draftMentionResponse(mention, intelContext);
+        // Draft a contextual response (founder-specific analytical prompt)
+        const replyText = await draftFounderMentionResponse(mention, intelContext);
         if (!replyText) continue;
 
         // Post the reply
