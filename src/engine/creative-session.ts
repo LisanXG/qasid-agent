@@ -4,7 +4,7 @@ import { searchRecentTweets, replyToTweet, getMentions, postThread, postTweetWit
 import { generateScorecardImage } from './scorecard-image.js';
 import { gatherIntelContext } from '../data/intelligence.js';
 import { getDiscretionaryRemaining, recordAction, getBudgetSummary } from './daily-budget.js';
-import { supabase } from '../supabase.js';
+import { hasRepliedTo, recordReply, getLastMentionId } from './reply-tracker.js';
 import { createLogger } from '../logger.js';
 import { sanitizeUserInput } from './sanitize-input.js';
 
@@ -25,50 +25,6 @@ const AVAILABLE_ACTIONS = [
     'IMAGE_POST — Post a signal scorecard image with live data',
     'SKIP — Save the remaining budget (no more actions this session)',
 ];
-
-/**
- * Check if we already replied to a tweet.
- */
-async function hasRepliedTo(tweetId: string): Promise<boolean> {
-    const { data } = await supabase
-        .from('qasid_replies')
-        .select('id')
-        .eq('target_tweet_id', tweetId)
-        .limit(1);
-    return (data?.length ?? 0) > 0;
-}
-
-/**
- * Record a reply for dedup.
- */
-async function recordReply(
-    targetId: string, targetAuthor: string,
-    replyId: string, replyText: string, source: string,
-): Promise<void> {
-    await supabase.from('qasid_replies').insert({
-        target_tweet_id: targetId,
-        target_author: targetAuthor,
-        reply_tweet_id: replyId,
-        reply_text: replyText,
-        search_query: source,
-        replied_at: new Date().toISOString(),
-    }).then(({ error }) => {
-        if (error) log.error('Failed to record reply', { error: error.message });
-    });
-}
-
-/**
- * Get the last processed mention ID.
- */
-async function getLastMentionId(): Promise<string | undefined> {
-    const { data } = await supabase
-        .from('qasid_mention_state')
-        .select('last_mention_id')
-        .eq('id', 'current')
-        .single();
-    return data?.last_mention_id ?? undefined;
-}
-
 // ---- Action Executors ----
 
 /**
@@ -115,11 +71,16 @@ Reply with ONLY the tweet text (or "SKIP"):`,
         if (reply.toUpperCase().startsWith('SKIP') || reply.length < 5) continue;
         reply = sanitizeContent(reply);
 
+        // Reserve budget BEFORE posting (consistent with executeBonusPost/executeThread)
+        const budgetOk = await recordAction('reply', `Reply to @${tweet.authorUsername}: ${reply.slice(0, 60)}`);
+        if (!budgetOk) {
+            log.warn('Budget reservation failed — skipping reply');
+            continue;
+        }
+
         const replyId = await replyToTweet(tweet.id, reply);
         if (replyId) {
             await recordReply(tweet.id, tweet.authorUsername ?? tweet.authorId, replyId, reply, 'creative-trending');
-            // Record budget AFTER successful post (reply is already posted, recording is bookkeeping)
-            await recordAction('reply', `Replied to @${tweet.authorUsername}: ${reply.slice(0, 60)}`, replyId);
             log.info('✅ Creative reply posted', { target: tweet.id, author: tweet.authorUsername });
             return true;
         }

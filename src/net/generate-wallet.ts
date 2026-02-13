@@ -41,9 +41,8 @@ try {
      Never share this key or commit it to git.
 `);
 } catch (error) {
-   // Fallback: if file write fails, print with a warning
-   console.error('⚠️  Could not write .env.generated file. Printing to terminal as fallback:');
-   console.log(`  🔑 Private Key: ${privateKey}`);
-   console.log(`  📍 Address:     ${account.address}`);
-   console.log('  ⚠️  CLEAR YOUR TERMINAL HISTORY after copying the key.');
+   // NEVER print the private key to stdout — it could end up in deployment logs
+   console.error('❌ Could not write .env.generated file. Please check directory permissions and try again.');
+   console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`);
+   process.exit(1);
 }

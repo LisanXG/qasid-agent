@@ -26,8 +26,6 @@ const FOUNDER_HANDLE = 'lisantherealone';
 
 /** Max skill proposals per day to avoid spamming the founder */
 const MAX_PROPOSALS_PER_DAY = 3;
-let proposalCount = 0;
-let proposalDate = '';
 
 /** Stable epoch for built-in skills (prevents timestamp reset on every deploy) */
 const BUILT_IN_EPOCH = '2025-02-10T00:00:00.000Z';
@@ -262,13 +260,14 @@ export async function discoverSkillFromContent(
     sourceUrl?: string,
 ): Promise<Skill | null> {
     try {
-        // Daily proposal rate limit
+        // Daily proposal rate limit (persisted via DB to survive redeploys)
         const today = new Date().toISOString().slice(0, 10);
-        if (proposalDate !== today) {
-            proposalDate = today;
-            proposalCount = 0;
-        }
-        if (proposalCount >= MAX_PROPOSALS_PER_DAY) {
+        const { count: todayProposals } = await supabase
+            .from('qasid_skills')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'pending_approval')
+            .gte('learned_at', `${today}T00:00:00.000Z`);
+        if ((todayProposals ?? 0) >= MAX_PROPOSALS_PER_DAY) {
             log.debug('Daily skill proposal cap reached — skipping');
             return null;
         }
@@ -369,7 +368,6 @@ Otherwise respond: NONE`,
 
         // Post to X asking founder for approval (uses 1 discretionary action)
         await requestSkillApproval(skill);
-        proposalCount++;
 
         return skill;
     } catch (error) {
@@ -437,7 +435,7 @@ Tweet text only:`,
     }
 
     try {
-        const tweetId = await postTweet(tweetText) as string | undefined;
+        const tweetId = await postTweet(tweetText);
         if (tweetId) {
             skill.approvalTweetId = tweetId;
             await supabase

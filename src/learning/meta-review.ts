@@ -100,7 +100,7 @@ export async function runMetaReview(): Promise<WeeklyReport | null> {
     };
 
     // Save report to Supabase (map to snake_case DB columns)
-    await supabase
+    const { error: insertError } = await supabase
         .from('qasid_meta_reviews')
         .insert({
             week_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -112,6 +112,9 @@ export async function runMetaReview(): Promise<WeeklyReport | null> {
             trend: report.trend,
             report: report,
         });
+    if (insertError) {
+        log.error('Failed to save meta review to DB', { error: insertError.message });
+    }
 
     // Snapshot to Net Protocol (on-chain brain)
     await snapshotMetaReview(report);

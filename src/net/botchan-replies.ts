@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { generate } from '../engine/llm.js';
 import { config, isNetConfigured } from '../config.js';
 import { createLogger } from '../logger.js';
@@ -47,7 +47,7 @@ interface BotchanComment {
  * Run a botchan CLI command and parse JSON output.
  * Sets BOTCHAN_PRIVATE_KEY from NET_PRIVATE_KEY automatically.
  */
-function runBotchanCmd<T>(args: string): T | null {
+function runBotchanCmd<T>(args: string[]): T | null {
     try {
         const env = {
             ...process.env,
@@ -55,7 +55,7 @@ function runBotchanCmd<T>(args: string): T | null {
             BOTCHAN_CHAIN_ID: '8453',
         };
 
-        const output = execSync(`npx botchan ${args} --json`, {
+        const output = execFileSync('npx', ['botchan', ...args, '--json'], {
             env,
             timeout: 30_000,
             encoding: 'utf-8',
@@ -72,7 +72,7 @@ function runBotchanCmd<T>(args: string): T | null {
 /**
  * Run a botchan write command (post/comment). Returns true on success.
  */
-function runBotchanWrite(args: string): boolean {
+function runBotchanWrite(args: string[]): boolean {
     try {
         const env = {
             ...process.env,
@@ -80,7 +80,7 @@ function runBotchanWrite(args: string): boolean {
             BOTCHAN_CHAIN_ID: '8453',
         };
 
-        execSync(`npx botchan ${args}`, {
+        execFileSync('npx', ['botchan', ...args], {
             env,
             timeout: 60_000,
             encoding: 'utf-8',
@@ -89,7 +89,7 @@ function runBotchanWrite(args: string): boolean {
 
         return true;
     } catch (error) {
-        log.error('Botchan write command failed', { args: args.slice(0, 80), error: String(error) });
+        log.error('Botchan write command failed', { args: args.slice(0, 3).join(' '), error: String(error) });
         return false;
     }
 }
@@ -147,7 +147,7 @@ async function handlePostReplies(): Promise<number> {
         text: string;
         commentCount: number;
         timestamp: number;
-    }>>('replies --limit 10');
+    }>>(['replies', '--limit', '10']);
 
     if (!replyData || replyData.length === 0) {
         log.debug('No post replies found');
@@ -162,7 +162,7 @@ async function handlePostReplies(): Promise<number> {
 
         // Read the comments on this post
         const comments = runBotchanCmd<BotchanComment[]>(
-            `comments "${post.feed}" "${post.postId}" --limit 5`,
+            ['comments', post.feed, post.postId, '--limit', '5'],
         );
 
         if (!comments || comments.length === 0) continue;
@@ -204,9 +204,8 @@ async function handlePostReplies(): Promise<number> {
             }
 
             // Post the reply as a comment on the original post
-            const escaped = reply.replace(/"/g, '\\"');
             const success = runBotchanWrite(
-                `comment "${post.feed}" "${post.postId}" "${escaped}"`,
+                ['comment', post.feed, post.postId, reply],
             );
 
             if (success) {
@@ -234,7 +233,7 @@ async function handleInboxMessages(): Promise<number> {
 
     // Read unseen messages to our address
     const messages = runBotchanCmd<BotchanPost[]>(
-        `read ${ourAddress} --unseen --limit 5`,
+        ['read', ourAddress, '--unseen', '--limit', '5'],
     );
 
     if (!messages || messages.length === 0) return 0;
@@ -272,9 +271,8 @@ async function handleInboxMessages(): Promise<number> {
         }
 
         // Reply directly to the sender's profile feed
-        const escaped = reply.replace(/"/g, '\\"');
         const success = runBotchanWrite(
-            `post ${msg.sender} "${escaped}"`,
+            ['post', msg.sender, reply],
         );
 
         if (success) {
@@ -290,7 +288,7 @@ async function handleInboxMessages(): Promise<number> {
 
     // Mark inbox as seen
     if (messages.length > 0) {
-        runBotchanWrite(`read ${ourAddress} --mark-seen`);
+        runBotchanWrite(['read', ourAddress, '--mark-seen']);
     }
 
     return repliesSent;

@@ -2,6 +2,7 @@ import { generate } from './llm.js';
 import { sanitizeContent } from './content.js';
 import { searchRecentTweets, replyToTweet, type SearchResult } from '../platforms/x.js';
 import { gatherIntelContext } from '../data/intelligence.js';
+import { hasRepliedTo, recordReply } from './reply-tracker.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
 import { config } from '../config.js';
@@ -44,45 +45,6 @@ const SEARCH_QUERIES = [
     '"signal accuracy" trading -is:retweet lang:en',
     '"win rate" trading crypto -is:retweet lang:en',
 ];
-
-// ---- Tracking (prevent double-replies) ----
-
-/**
- * Check if we already replied to a tweet (stored in Supabase).
- */
-async function hasRepliedTo(tweetId: string): Promise<boolean> {
-    const { data } = await supabase
-        .from('qasid_replies')
-        .select('id')
-        .eq('target_tweet_id', tweetId)
-        .limit(1);
-    return (data?.length ?? 0) > 0;
-}
-
-/**
- * Record a reply so we never double-reply.
- */
-async function recordReply(
-    targetTweetId: string,
-    targetAuthor: string,
-    replyTweetId: string,
-    replyText: string,
-    searchQuery: string,
-): Promise<void> {
-    const { error } = await supabase
-        .from('qasid_replies')
-        .insert({
-            target_tweet_id: targetTweetId,
-            target_author: targetAuthor,
-            reply_tweet_id: replyTweetId,
-            reply_text: replyText,
-            search_query: searchQuery,
-            replied_at: new Date().toISOString(),
-        });
-    if (error) {
-        log.error('Failed to record reply', { error: error.message });
-    }
-}
 
 /**
  * Count replies in the last 24 hours (safety limit).

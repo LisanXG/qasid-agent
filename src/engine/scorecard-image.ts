@@ -140,66 +140,66 @@ function buildScorecardSvg(
         </linearGradient>
     </defs>
 
-    <!--Background -->
-        <rect width="${width}" height = "${height}" fill = "url(#bgGrad)" rx = "20" />
+    <!-- Background -->
+    <rect width="${width}" height="${height}" fill="url(#bgGrad)" rx="20"/>
 
-            <!--Top accent line-- >
-                <rect x="0" y = "0" width = "${width}" height = "4" fill = "url(#accentLine)" rx = "2" />
+    <!-- Top accent line -->
+    <rect x="0" y="0" width="${width}" height="4" fill="url(#accentLine)" rx="2"/>
 
-                    <!--Header -->
-                        <text x="${padding}" y = "55" fill = "${COLORS.cyan}" font - size="28" font - weight="bold" font - family="monospace" > LISAN INTELLIGENCE </text>
-                            < text x = "${padding}" y = "82" fill = "${COLORS.textDim}" font - size="16" font - family="monospace" > Signal Scorecard — ${new Date().toISOString().slice(0, 10)} </text>
+    <!-- Header -->
+    <text x="${padding}" y="55" fill="${COLORS.cyan}" font-size="28" font-weight="bold" font-family="monospace">LISAN INTELLIGENCE</text>
+    <text x="${padding}" y="82" fill="${COLORS.textDim}" font-size="16" font-family="monospace">Signal Scorecard — ${new Date().toISOString().slice(0, 10)}</text>
 
-                                < !--Regime badge-- >
-                                    <rect x="${width - padding - 220}" y = "30" width = "220" height = "60" rx = "12" fill = "${regimeColor}" opacity = "0.15" />
-                                        <rect x="${width - padding - 220}" y = "30" width = "220" height = "60" rx = "12" stroke = "${regimeColor}" stroke - width="1.5" fill = "none" />
-                                            <text x="${width - padding - 110}" y = "55" fill = "${regimeColor}" font - size="14" font - weight="bold" font - family="monospace" text - anchor="middle" > MARKET REGIME </text>
-                                                < text x = "${width - padding - 110}" y = "78" fill = "${regimeColor}" font - size="22" font - weight="bold" font - family="monospace" text - anchor="middle" > ${regime} </text>
+    <!-- Regime badge -->
+    <rect x="${width - padding - 220}" y="30" width="220" height="60" rx="12" fill="${regimeColor}" opacity="0.15"/>
+    <rect x="${width - padding - 220}" y="30" width="220" height="60" rx="12" stroke="${regimeColor}" stroke-width="1.5" fill="none"/>
+    <text x="${width - padding - 110}" y="55" fill="${regimeColor}" font-size="14" font-weight="bold" font-family="monospace" text-anchor="middle">MARKET REGIME</text>
+    <text x="${width - padding - 110}" y="78" fill="${regimeColor}" font-size="22" font-weight="bold" font-family="monospace" text-anchor="middle">${regime}</text>
 
-                                                    < !--Stats row-- >
-                                                        <line x1="${padding}" y1 = "110" x2 = "${width - padding}" y2 = "110" stroke = "${COLORS.border}" stroke - width="1" />
+    <!-- Stats row -->
+    <line x1="${padding}" y1="110" x2="${width - padding}" y2="110" stroke="${COLORS.border}" stroke-width="1"/>
 
-                                                            <!--Win Rate-- >
-                                                                <text x="${padding + 10}" y = "145" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > WIN RATE </text>
-                                                                    < text x = "${padding + 10}" y = "175" fill = "${COLORS.green}" font - size="28" font - weight="bold" font - family="monospace" > ${winRate}% </text>
+    <!-- Win Rate -->
+    <text x="${padding + 10}" y="145" fill="${COLORS.textDim}" font-size="13" font-family="monospace">WIN RATE</text>
+    <text x="${padding + 10}" y="175" fill="${COLORS.green}" font-size="28" font-weight="bold" font-family="monospace">${winRate}%</text>
 
-                                                                        < !--Total Signals-- >
-                                                                            <text x="${padding + 200}" y = "145" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > TOTAL SIGNALS </text>
-                                                                                < text x = "${padding + 200}" y = "175" fill = "${COLORS.textPrimary}" font - size="28" font - weight="bold" font - family="monospace" > ${totalSignals} </text>
+    <!-- Total Signals -->
+    <text x="${padding + 200}" y="145" fill="${COLORS.textDim}" font-size="13" font-family="monospace">TOTAL SIGNALS</text>
+    <text x="${padding + 200}" y="175" fill="${COLORS.textPrimary}" font-size="28" font-weight="bold" font-family="monospace">${totalSignals}</text>
 
-                                                                                    < !--Cumulative Return-- >
-                                                                                        <text x="${padding + 420}" y = "145" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > CUMULATIVE </text>
-                                                                                            < text x = "${padding + 420}" y = "175" fill = "${COLORS.cyan}" font - size="28" font - weight="bold" font - family="monospace" > ${cumReturn} </text>
+    <!-- Cumulative Return -->
+    <text x="${padding + 420}" y="145" fill="${COLORS.textDim}" font-size="13" font-family="monospace">CUMULATIVE</text>
+    <text x="${padding + 420}" y="175" fill="${COLORS.cyan}" font-size="28" font-weight="bold" font-family="monospace">${cumReturn}</text>
 
-                                                                                                < !--Fear & Greed-- >
-                                                                                                <text x="${padding + 640}" y = "145" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > FEAR & amp; GREED </text>
-                                                                                                    < text x = "${padding + 640}" y = "175" fill = "${fearGreed > 60 ? COLORS.green : fearGreed < 40 ? COLORS.red : COLORS.yellow}" font - size="28" font - weight="bold" font - family="monospace" > ${fearGreed} </text>
+    <!-- Fear & Greed -->
+    <text x="${padding + 640}" y="145" fill="${COLORS.textDim}" font-size="13" font-family="monospace">FEAR &amp; GREED</text>
+    <text x="${padding + 640}" y="175" fill="${fearGreed > 60 ? COLORS.green : fearGreed < 40 ? COLORS.red : COLORS.yellow}" font-size="28" font-weight="bold" font-family="monospace">${fearGreed}</text>
 
-                                                                                                        < !--Active Signals label-- >
-                                                                                                            <text x="${padding + 860}" y = "145" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > ACTIVE SIGNALS </text>
-                                                                                                                < text x = "${padding + 860}" y = "175" fill = "${COLORS.purple}" font - size="28" font - weight="bold" font - family="monospace" > ${signals.length} </text>
+    <!-- Active Signals label -->
+    <text x="${padding + 860}" y="145" fill="${COLORS.textDim}" font-size="13" font-family="monospace">ACTIVE SIGNALS</text>
+    <text x="${padding + 860}" y="175" fill="${COLORS.purple}" font-size="28" font-weight="bold" font-family="monospace">${signals.length}</text>
 
-                                                                                                                    < line x1 = "${padding}" y1 = "200" x2 = "${width - padding}" y2 = "200" stroke = "${COLORS.border}" stroke - width="1" />
+    <line x1="${padding}" y1="200" x2="${width - padding}" y2="200" stroke="${COLORS.border}" stroke-width="1"/>
 
-                                                                                                                        <!--Column headers-- >
-                                                                                                                            <text x="${padding + 10}" y = "240" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > ASSET </text>
-                                                                                                                                < text x = "${padding + 120}" y = "240" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > DIR </text>
-                                                                                                                                    < text x = "${padding + 210}" y = "240" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > ENTRY </text>
-                                                                                                                                        < text x = "${padding + 380}" y = "240" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > SCORE </text>
-                                                                                                                                            < text x = "${padding + 660}" y = "240" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > R: R </text>
-                                                                                                                                                < text x = "${padding + 780}" y = "240" fill = "${COLORS.textDim}" font - size="13" font - family="monospace" > CLUSTERS </text>
+    <!-- Column headers -->
+    <text x="${padding + 10}" y="240" fill="${COLORS.textDim}" font-size="13" font-family="monospace">ASSET</text>
+    <text x="${padding + 120}" y="240" fill="${COLORS.textDim}" font-size="13" font-family="monospace">DIR</text>
+    <text x="${padding + 210}" y="240" fill="${COLORS.textDim}" font-size="13" font-family="monospace">ENTRY</text>
+    <text x="${padding + 380}" y="240" fill="${COLORS.textDim}" font-size="13" font-family="monospace">SCORE</text>
+    <text x="${padding + 660}" y="240" fill="${COLORS.textDim}" font-size="13" font-family="monospace">R:R</text>
+    <text x="${padding + 780}" y="240" fill="${COLORS.textDim}" font-size="13" font-family="monospace">CLUSTERS</text>
 
-                                                                                                                                                    < line x1 = "${padding}" y1 = "252" x2 = "${width - padding}" y2 = "252" stroke = "${COLORS.border}" stroke - width="0.5" />
+    <line x1="${padding}" y1="252" x2="${width - padding}" y2="252" stroke="${COLORS.border}" stroke-width="0.5"/>
 
-                                                                                                                                                        <!--Signal rows-- >
-                                                                                                                                                            ${signalRows}
+    <!-- Signal rows -->
+    ${signalRows}
 
-    <!--Footer -->
-        <line x1="${padding}" y1 = "${height - 50}" x2 = "${width - padding}" y2 = "${height - 50}" stroke = "${COLORS.border}" stroke - width="0.5" />
-            <text x="${padding + 10}" y = "${height - 20}" fill = "${COLORS.textDim}" font - size="14" font - family="monospace" > lisanintel.com / proof </text>
-                < text x = "${width - padding - 10}" y = "${height - 20}" fill = "${COLORS.cyan}" font - size="14" font - weight="bold" font - family="monospace" text - anchor="end" > QasidAI — The Messenger 🎯</text>
+    <!-- Footer -->
+    <line x1="${padding}" y1="${height - 50}" x2="${width - padding}" y2="${height - 50}" stroke="${COLORS.border}" stroke-width="0.5"/>
+    <text x="${padding + 10}" y="${height - 20}" fill="${COLORS.textDim}" font-size="14" font-family="monospace">lisanintel.com/proof</text>
+    <text x="${width - padding - 10}" y="${height - 20}" fill="${COLORS.cyan}" font-size="14" font-weight="bold" font-family="monospace" text-anchor="end">QasidAI — The Messenger 🎯</text>
 
-                    < !--Bottom accent line-- >
-                        <rect x="0" y = "${height - 4}" width = "${width}" height = "4" fill = "url(#accentLine)" rx = "2" />
-                            </svg>`;
+    <!-- Bottom accent line -->
+    <rect x="0" y="${height - 4}" width="${width}" height="4" fill="url(#accentLine)" rx="2"/>
+</svg>`;
 }

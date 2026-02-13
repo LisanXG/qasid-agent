@@ -2,6 +2,7 @@ import { generate } from './llm.js';
 import { sanitizeContent } from './content.js';
 import { getMentions, replyToTweet, getTweetById, type MentionTweet } from '../platforms/x.js';
 import { gatherIntelContext } from '../data/intelligence.js';
+import { hasRepliedTo, recordReply, getLastMentionId, saveLastMentionId } from './reply-tracker.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
 import { processSkillApproval, discoverSkillFromContent } from '../skills/skill-manager.js';
@@ -33,72 +34,6 @@ const MAX_MENTION_AGE_MS = 6 * 60 * 60 * 1000;
 /** In-memory set of founder mention IDs already processed this session.
  *  Prevents re-evaluating the same mentions every 15-min cron cycle. */
 const processedFounderMentionIds = new Set<string>();
-
-/**
- * Get the last processed mention ID from Supabase (watermark).
- * This ensures we only process new mentions on each cycle.
- */
-async function getLastMentionId(): Promise<string | undefined> {
-    const { data } = await supabase
-        .from('qasid_mention_state')
-        .select('last_mention_id')
-        .eq('id', 'current')
-        .single();
-    return data?.last_mention_id ?? undefined;
-}
-
-/**
- * Save the last processed mention ID (watermark).
- */
-async function saveLastMentionId(mentionId: string): Promise<void> {
-    const { error } = await supabase
-        .from('qasid_mention_state')
-        .upsert({
-            id: 'current',
-            last_mention_id: mentionId,
-            updated_at: new Date().toISOString(),
-        });
-    if (error) {
-        log.error('Failed to save mention watermark', { error: error.message });
-    }
-}
-
-/**
- * Check if we already responded to this mention.
- */
-async function hasRespondedTo(tweetId: string): Promise<boolean> {
-    const { data } = await supabase
-        .from('qasid_replies')
-        .select('id')
-        .eq('target_tweet_id', tweetId)
-        .limit(1);
-    return (data?.length ?? 0) > 0;
-}
-
-/**
- * Record a mention response (reuses the qasid_replies table).
- */
-async function recordMentionResponse(
-    targetTweetId: string,
-    targetAuthor: string,
-    replyTweetId: string,
-    replyText: string,
-    source: string = '@mention',
-): Promise<void> {
-    const { error } = await supabase
-        .from('qasid_replies')
-        .insert({
-            target_tweet_id: targetTweetId,
-            target_author: targetAuthor,
-            reply_tweet_id: replyTweetId,
-            reply_text: replyText,
-            search_query: source,
-            replied_at: new Date().toISOString(),
-        });
-    if (error) {
-        log.error('Failed to record mention response', { error: error.message });
-    }
-}
 
 /**
  * Count mention responses in the last 24h (safety limit).
@@ -356,7 +291,7 @@ export async function runMentionMonitor(): Promise<number> {
         }
 
         // Skip if already responded
-        if (await hasRespondedTo(mention.id)) {
+        if (await hasRepliedTo(mention.id)) {
             log.debug('Already responded to mention', { tweetId: mention.id });
             continue;
         }
@@ -382,7 +317,7 @@ export async function runMentionMonitor(): Promise<number> {
                         : `Got it — skipping ${approval.skill.name}. Your call. 🫡`;
                     const ackId = await replyToTweet(mention.id, ack);
                     if (ackId) {
-                        await recordMentionResponse(mention.id, mention.authorUsername, ackId, ack);
+                        await recordReply(mention.id, mention.authorUsername, ackId, ack, '@mention');
                         responded++;
                     }
                     continue;
@@ -392,13 +327,20 @@ export async function runMentionMonitor(): Promise<number> {
             }
         }
 
+        // Skip founder mentions — handled by the dedicated VIP monitor
+        // (prevents double-reply: general + VIP responding to the same tweet)
+        if (mention.authorUsername?.toLowerCase() === 'lisantherealone') {
+            log.debug('Skipping founder mention (handled by VIP monitor)', { tweetId: mention.id });
+            continue;
+        }
+
         // Draft a response
         const replyText = await draftMentionResponse(mention, intelContext);
         if (!replyText) continue;
 
         // Pre-reply dedup guard: re-check right before posting to prevent
         // race condition with founder monitor processing the same mention
-        if (await hasRespondedTo(mention.id)) {
+        if (await hasRepliedTo(mention.id)) {
             log.debug('Mention already handled (race guard)', { tweetId: mention.id });
             continue;
         }
@@ -413,11 +355,12 @@ export async function runMentionMonitor(): Promise<number> {
         const replyId = await replyToTweet(mention.id, replyText);
 
         if (replyId) {
-            await recordMentionResponse(
+            await recordReply(
                 mention.id,
                 mention.authorUsername ?? mention.authorId,
                 replyId,
                 replyText,
+                '@mention',
             );
             responded++;
             log.info('✅ Mention response posted', {
@@ -512,7 +455,7 @@ export async function runFounderMentionCheck(): Promise<number> {
         if (processedFounderMentionIds.has(mention.id)) continue;
 
         // Skip if already responded (check Supabase)
-        if (await hasRespondedTo(mention.id)) {
+        if (await hasRepliedTo(mention.id)) {
             processedFounderMentionIds.add(mention.id); // Don't check again
             continue;
         }
@@ -537,7 +480,7 @@ export async function runFounderMentionCheck(): Promise<number> {
                         : `Got it — skipping ${approval.skill.name}. Your call. 🫡`;
                     const ackId = await replyToTweet(mention.id, ack);
                     if (ackId) {
-                        await recordMentionResponse(mention.id, FOUNDER_HANDLE, ackId, ack, 'founder_vip');
+                        await recordReply(mention.id, FOUNDER_HANDLE, ackId, ack, 'founder_vip');
                         replied++;
                     }
                     continue;
@@ -565,7 +508,7 @@ export async function runFounderMentionCheck(): Promise<number> {
 
         // Pre-reply dedup guard: re-check right before posting to prevent
         // race condition with general monitor processing the same mention
-        if (await hasRespondedTo(mention.id)) {
+        if (await hasRepliedTo(mention.id)) {
             processedFounderMentionIds.add(mention.id);
             log.debug('Founder mention already handled (race guard)', { tweetId: mention.id });
             continue;
@@ -575,7 +518,7 @@ export async function runFounderMentionCheck(): Promise<number> {
         const replyId = await replyToTweet(mention.id, replyText);
 
         if (replyId) {
-            await recordMentionResponse(mention.id, FOUNDER_HANDLE, replyId, replyText, 'founder_vip');
+            await recordReply(mention.id, FOUNDER_HANDLE, replyId, replyText, 'founder_vip');
             processedFounderMentionIds.add(mention.id);
             replied++;
             log.info('👑 Replied to founder mention', {

@@ -141,7 +141,7 @@ async function runContentCycle(options?: {
 
 /**
  * Start the content scheduler.
- * 10 content posts/day spread across waking hours (UTC):
+ * 10 content posts/day spread across waking hours (US Eastern):
  * - 06:00 🌅 GM post (+ Botchan cross-post)
  * - 08:00 📊 Market/signal data
  * - 10:00 🧱 Builder narrative / founder journey
@@ -154,9 +154,9 @@ async function runContentCycle(options?: {
  * - 23:30 🌙 Evening reflection / builder log
  *
  * Learning engine crons:
- * - Daily (1 AM UTC):    Score posts + adapt weights
- * - Weekly (Sun 2 AM UTC): Meta-review (performance report)
- * - Daily (11:59 PM UTC): Summary to Net Protocol
+ * - Daily (1 AM ET):    Score posts + adapt weights
+ * - Weekly (Sun 2 AM ET): Meta-review (performance report)
+ * - Daily (11:59 PM ET): Summary to Net Protocol
  */
 export function startScheduler(): void {
     log.info('Starting content scheduler (10 posts/day)...');
@@ -173,14 +173,14 @@ export function startScheduler(): void {
 
     // ---- 10 Content Cycles / Day ----
 
-    // 06:00 UTC — 🌅 GM post (+ Botchan cross-post)
+    // 06:00 ET — 🌅 GM post (+ Botchan cross-post)
     const gm = cron.schedule('0 6 * * *', async () => {
         log.info('🌅 GM cycle starting (+ Botchan cross-post)');
         await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'gm_post' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(gm);
 
-    // 08:00 UTC — 📊 Market / signal data (WITH scorecard image)
+    // 08:00 ET — 📊 Market / signal data (WITH scorecard image)
     const marketData = cron.schedule('0 8 * * *', async () => {
         log.info('📊 Market data cycle starting (with scorecard image)');
         try {
@@ -204,88 +204,88 @@ export function startScheduler(): void {
         }
         // Fallback to text-only
         await runContentCycle({ preferredContentType: 'signal_scorecard' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(marketData);
 
-    // 10:00 UTC — 🧱 Builder narrative / founder journey (+ Botchan)
+    // 10:00 ET — 🧱 Builder narrative / founder journey (+ Botchan)
     const builder = cron.schedule('0 10 * * *', async () => {
         log.info('🧱 Builder narrative cycle starting (+ Botchan)');
         await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'builder_narrative' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(builder);
 
-    // 12:00 UTC — 💡 Educational
+    // 12:00 ET — 💡 Educational
     const educational = cron.schedule('0 12 * * *', async () => {
         log.info('💡 Educational cycle starting');
         await runContentCycle({ preferredContentType: 'educational' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(educational);
 
-    // 14:00 UTC — 🔥 Engagement / hot take (+ Botchan)
+    // 14:00 ET — 🔥 Engagement / hot take (+ Botchan)
     const engagement = cron.schedule('0 14 * * *', async () => {
         log.info('🔥 Engagement cycle starting (+ Botchan)');
         await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'engagement_bait' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(engagement);
 
-    // 16:00 UTC — 📦 Product spotlight
+    // 16:00 ET — 📦 Product spotlight
     const product = cron.schedule('0 16 * * *', async () => {
         log.info('📦 Product spotlight cycle starting');
         await runContentCycle({ preferredContentType: 'product_spotlight' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(product);
 
-    // 18:00 UTC — 🤖 Self-aware / meta AI (+ Botchan)
+    // 18:00 ET — 🤖 Self-aware / meta AI (+ Botchan)
     const selfAware = cron.schedule('0 18 * * *', async () => {
         log.info('🤖 Self-aware cycle starting (+ Botchan)');
         await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'self_aware' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(selfAware);
 
-    // 20:00 UTC — 📈 Signal performance / proof
+    // 20:00 ET — 📈 Signal performance / proof
     const performance = cron.schedule('0 20 * * *', async () => {
         log.info('📈 Performance cycle starting');
         await runContentCycle({ preferredContentType: 'win_streak' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(performance);
 
-    // 22:00 UTC — 🧠 Engagement bait / cult vibes (+ Botchan)
+    // 22:00 ET — 🧠 Engagement bait / cult vibes (+ Botchan)
     const lateEngagement = cron.schedule('0 22 * * *', async () => {
         log.info('🧠 Late engagement cycle starting (+ Botchan)');
         await runContentCycle({ crossPostToBotchan: true, preferredContentType: 'founder_journey' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(lateEngagement);
 
-    // 23:30 UTC — 🌙 Evening reflection
+    // 23:30 ET — 🌙 Evening reflection
     const evening = cron.schedule('30 23 * * *', async () => {
         log.info('🌙 Evening reflection cycle starting');
         await runContentCycle({ preferredContentType: 'social_proof' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(evening);
 
     // ---- Overnight Posts (fills the 23:30 → 06:00 dead zone) ----
 
-    // 1:30 UTC — 🌃 Late night founder reflection
+    // 1:30 ET — 🌃 Late night founder reflection
     const nightOwl1 = cron.schedule('30 1 * * *', async () => {
         log.info('🌃 Night owl cycle 1 — founder reflection');
         await runContentCycle({ preferredContentType: 'founder_journey' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(nightOwl1);
 
-    // 3:30 UTC — 🌃 Late night market alpha
+    // 3:30 ET — 🌃 Late night market alpha
     const nightOwl2 = cron.schedule('30 3 * * *', async () => {
         log.info('🌃 Night owl cycle 2 — market alpha');
         await runContentCycle({ preferredContentType: 'market_regime' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(nightOwl2);
 
-    // 5:30 UTC — 🌃 Pre-dawn builder narrative
+    // 5:30 ET — 🌃 Pre-dawn builder narrative
     const nightOwl3 = cron.schedule('30 5 * * *', async () => {
         log.info('🌃 Night owl cycle 3 — builder narrative');
         await runContentCycle({ preferredContentType: 'builder_narrative' });
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(nightOwl3);
-    log.info('🌃 Night owl posts active (1:30, 3:30, 5:30 UTC — reflective content)');
+    log.info('🌃 Night owl posts active (1:30, 3:30, 5:30 ET — reflective content)');
 
     // ---- Creative Sessions (LLM-driven discretionary budget) ----
 
@@ -298,13 +298,13 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Creative session failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(creative);
-    log.info('🎨 Creative sessions active (9:30, 13:30, 17:30, 21:30 UTC — QasidAI decides)');
+    log.info('🎨 Creative sessions active (9:30, 13:30, 17:30, 21:30 ET — QasidAI decides)');
 
     // ---- Botchan Native Content (unique posts for Net Protocol) ----
 
-    // 11:00 UTC — Botchan market analysis or signal breakdown
+    // 11:00 ET — Botchan market analysis or signal breakdown
     const botchanMorning = cron.schedule('0 11 * * *', async () => {
         log.info('🤖 Botchan native content: market/signal post');
         try {
@@ -313,10 +313,10 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Botchan morning post failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(botchanMorning);
 
-    // 15:00 UTC — Botchan net reflection / on-chain brain activity
+    // 15:00 ET — Botchan net reflection / on-chain brain activity
     const botchanAfternoon = cron.schedule('0 15 * * *', async () => {
         log.info('🤖 Botchan native content: net reflection / on-chain activity');
         try {
@@ -326,10 +326,10 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Botchan afternoon post failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(botchanAfternoon);
 
-    // 19:00 UTC — Botchan builder log, capability share, or GitHub share
+    // 19:00 ET — Botchan builder log, capability share, or GitHub share
     const botchanEvening = cron.schedule('0 19 * * *', async () => {
         log.info('🤖 Botchan native content: builder/capability post');
         try {
@@ -339,11 +339,11 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Botchan evening post failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(botchanEvening);
-    log.info('🤖 Botchan native content active (11:00, 15:00, 19:00 UTC)');
+    log.info('🤖 Botchan native content active (11:00, 15:00, 19:00 ET)');
 
-    // Daily at 0:30 AM UTC — Fetch engagement metrics from X API
+    // Daily at 0:30 AM ET — Fetch engagement metrics from X API
     const engagementFetch = cron.schedule('30 0 * * *', async () => {
         log.info('📊 Fetching engagement metrics from X API...');
         try {
@@ -352,11 +352,11 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Engagement fetch failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(engagementFetch);
-    log.info('📊 Engagement fetch cron active (0:30 AM UTC)');
+    log.info('📊 Engagement fetch cron active (0:30 AM ET)');
 
-    // Daily at 1 AM UTC — Score old posts and adapt strategy weights
+    // Daily at 1 AM ET — Score old posts and adapt strategy weights
     const dailyLearning = cron.schedule('0 1 * * *', async () => {
         log.info('🧠 Daily learning cycle: fetch metrics → score → adapt weights');
         try {
@@ -367,11 +367,11 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Daily learning cycle failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(dailyLearning);
-    log.info('🧠 Daily learning cron active (1 AM UTC — fetch + score + adapt weights)');
+    log.info('🧠 Daily learning cron active (1 AM ET — fetch + score + adapt weights)');
 
-    // Daily at 1:30 AM UTC — Sync skills to Net Protocol
+    // Daily at 1:30 AM ET — Sync skills to Net Protocol
     if (isNetConfigured) {
         const skillSync = cron.schedule('30 1 * * *', async () => {
             log.info('🧠 Syncing skills to Net Protocol...');
@@ -380,12 +380,12 @@ export function startScheduler(): void {
             } catch (error) {
                 log.error('Skill sync failed', { error: String(error) });
             }
-        }, { timezone: 'UTC' });
+        }, { timezone: 'America/New_York' });
         activeTasks.push(skillSync);
-        log.info('🧠 Skill sync cron active (1:30 AM UTC)');
+        log.info('🧠 Skill sync cron active (1:30 AM ET)');
     }
 
-    // Weekly on Sundays at 2 AM UTC — Run meta-review
+    // Weekly on Sundays at 2 AM ET — Run meta-review
     const weeklyReview = cron.schedule('0 2 * * 0', async () => {
         log.info('📊 Weekly meta-review starting');
         try {
@@ -393,11 +393,11 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Weekly meta-review failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(weeklyReview);
-    log.info('📊 Weekly meta-review cron active (Sun 2 AM UTC)');
+    log.info('📊 Weekly meta-review cron active (Sun 2 AM ET)');
 
-    // Daily at 3 AM UTC — Smart follow (follow engaged users)
+    // Daily at 3 AM ET — Smart follow (follow engaged users)
     const smartFollow = cron.schedule('0 3 * * *', async () => {
         log.info('👥 Smart follow cycle starting');
         try {
@@ -406,11 +406,11 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Smart follow failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(smartFollow);
-    log.info('👥 Smart follow cron active (3 AM UTC)');
+    log.info('👥 Smart follow cron active (3 AM ET)');
 
-    // End-of-day — 11:55 PM UTC — Daily summary to Net Protocol (before the 23:30 reflection)
+    // End-of-day — 11:55 PM ET — Daily summary to Net Protocol (before the 23:30 reflection)
     if (isNetConfigured) {
         const dailySummary = cron.schedule('55 23 * * *', async () => {
             log.info('⏰ End-of-day: writing daily summary to Net Protocol');
@@ -419,9 +419,9 @@ export function startScheduler(): void {
             } catch (error) {
                 log.error('Daily summary failed', { error: String(error) });
             }
-        }, { timezone: 'UTC' });
+        }, { timezone: 'America/New_York' });
         activeTasks.push(dailySummary);
-        log.info('📝 Daily summary cron active (11:55 PM UTC → Net Protocol)');
+        log.info('📝 Daily summary cron active (11:55 PM ET → Net Protocol)');
     }
 
     if (isNetConfigured) {
@@ -439,7 +439,7 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Founder mention check failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(founderMentions);
     log.info('👑 Founder VIP mention monitor active (every 15 min)');
 
@@ -454,7 +454,7 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Mention monitor failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(mentionMonitor);
     log.info('💬 General mention monitor active (every 30 min)');
 
@@ -467,7 +467,7 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Skill scout (AM) failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(skillScoutAM);
 
     const skillScoutPM = cron.schedule('0 22 * * *', async () => {
@@ -478,9 +478,9 @@ export function startScheduler(): void {
         } catch (error) {
             log.error('Skill scout (PM) failed', { error: String(error) });
         }
-    }, { timezone: 'UTC' });
+    }, { timezone: 'America/New_York' });
     activeTasks.push(skillScoutPM);
-    log.info('🔍 Skill scout active (2x/day: 10:00 & 22:00 UTC)');
+    log.info('🔍 Skill scout active (2x/day: 10:00 & 22:00 ET)');
 
     // ---- Botchan Reply Monitor (every 30 min) ----
     if (isNetConfigured) {
@@ -494,7 +494,7 @@ export function startScheduler(): void {
             } catch (error) {
                 log.error('Botchan reply monitor failed', { error: String(error) });
             }
-        }, { timezone: 'UTC' });
+        }, { timezone: 'America/New_York' });
         activeTasks.push(botchanReplies);
         log.info('📨 Botchan reply monitor active (every 30 min)');
     }
