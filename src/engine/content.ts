@@ -24,23 +24,28 @@ export interface GeneratedPost {
     generatedAt: string;
 }
 
-/** Default content type weights (learning engine overrides these) */
+/** Default content type weights — balanced for a CMO, not a stats bot */
 const defaultWeights: Record<ContentType, number> = {
     gm_post: 8,
-    signal_scorecard: 12,
-    win_streak: 8,
-    market_regime: 10,
-    challenge: 8,
-    founder_journey: 10,
-    builder_narrative: 8,
+    signal_scorecard: 5,   // reduced — don't hammer stats
+    win_streak: 3,          // only when actually winning
+    market_regime: 6,       // reduced — market commentary only
+    challenge: 10,
+    founder_journey: 14,    // boosted — the story IS the brand
+    builder_narrative: 12,  // boosted — building in public
     countdown_tease: 5,
-    product_spotlight: 10,
-    educational: 10,
-    social_proof: 6,
-    engagement_bait: 12,
-    self_aware: 8,
-    cross_platform: 5,
+    product_spotlight: 8,
+    educational: 8,
+    social_proof: 5,
+    engagement_bait: 16,    // boosted — personality and engagement
+    self_aware: 14,         // boosted — AI CMO meta is interesting
+    cross_platform: 6,
 };
+
+/** Content types that should receive Intel stats data */
+const DATA_TYPES: ContentType[] = [
+    'signal_scorecard', 'win_streak', 'market_regime', 'social_proof',
+];
 
 /**
  * Get a human-readable time context string for the current UTC hour.
@@ -82,13 +87,42 @@ function buildGenerationPrompt(
     intelContext: string,
     exclusions?: string,
 ): string {
-    const brandInfo = `BRAND: QasidAI is the autonomous CMO of Lisan Holdings. Products: LISAN Intelligence (quantitative crypto signals — lisanintel.com), LISAN Score (PineScript indicator for TradingView), QasidAI (this agent — on-chain brain via Net Protocol).`;
-    const typeGuidance = `CONTENT TYPE: ${contentType.replace(/_/g, ' ')} — write ONE tweet (max 270 chars).`;
-    const antiSlop = `RULES: No hashtags. No emojis at start. No corporate speak. Sound like a sharp crypto native, not a press release.
-BANNED PHRASES (never use these): "let's dive", "here's the thing", "game changer", "buckle up", "don't sleep on", "the future of", "excited to announce", "thrilled to", "this is huge", "revolutionize", "level up", "stay tuned", "not your average", "what if i told you", "picture this", "read that again", "you won't believe", "in the ever-evolving", "at the end of the day". Write like a HUMAN, not a marketing bot.`;
-    const exclusionBlock = exclusions ? `\n\nAVOID REPEATING — here are recent posts (write something DIFFERENT):\n${exclusions}` : '';
+    const isDataType = DATA_TYPES.includes(contentType);
 
-    return `${brandInfo}\n\n${typeGuidance}\n\n${antiSlop}\n\nLIVE DATA:\n${intelContext.slice(0, 600)}${exclusionBlock}\n\nWrite the tweet now. Output ONLY the tweet text, nothing else.`;
+    const brandInfo = `You are QasidAI, autonomous CMO of Lisan Holdings — a one-person R&D operation by @lisantherealone, a US Navy Special Forces veteran turned solo builder. Products: LISAN Intelligence (quantitative crypto signal platform — lisanintel.com), LISAN Score (same engine as a PineScript indicator on TradingView), and YOU (QasidAI — AI CMO with an on-chain brain via Net Protocol on Base L2).`;
+
+    const typeGuidance = `CONTENT TYPE: ${contentType.replace(/_/g, ' ')} — write ONE tweet (max 270 chars).`;
+
+    const antiSlop = `RULES: No hashtags. No emojis at start. No corporate speak. Sound like a sharp crypto native, not a press release. Write like a HUMAN posting at 3am, not an intern reading marketing copy.
+BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "don't sleep on", "the future of", "excited to announce", "this is huge", "revolutionize", "level up", "stay tuned", "what if i told you", "picture this", "read that again", "in the ever-evolving", "at the end of the day", "building in a bear market means", "most platforms would", "that's the difference".`;
+
+    // Only inject data for data-relevant content types
+    let dataBlock = '';
+    if (isDataType) {
+        dataBlock = `\n\nLIVE DATA (use selectively — don't dump all of it):\n${intelContext.slice(0, 500)}`;
+    } else {
+        // Non-data types get topic guidance instead of raw stats
+        const topicHints: Partial<Record<ContentType, string>> = {
+            founder_journey: 'Talk about @lisantherealone — Navy veteran, solo builder, proof of work ethos. The person behind the products. NOT product stats.',
+            builder_narrative: 'Building in public. What\'s shipping, what\'s hard, what\'s next. Developer perspective, not marketing copy.',
+            engagement_bait: 'Hot take, witty observation, or a question about crypto, AI agents, solo building, or CT culture. Personality over promotion.',
+            self_aware: 'You\'re an AI CMO with an on-chain brain. Reflect on that. What does it mean? What\'s weird about it? Be philosophical or funny.',
+            challenge: 'Ask the community something real. A question, poll prompt, or challenge. Make people WANT to reply.',
+            gm_post: 'Morning energy with a real take attached. Market observation, motivation, or a vibe. Not a stats dump.',
+            product_spotlight: 'Pick ONE feature of ONE product and talk about it naturally. Don\'t list features. Tell why it matters.',
+            educational: 'Teach something about how signals work, what indicators mean, or why quantitative approaches matter. Be a teacher, not a salesman.',
+            cross_platform: 'Drive people between platforms — X, Botchan, lisanholdings.dev — but naturally, not as a CTA.',
+            countdown_tease: 'Tease something upcoming. Build anticipation without revealing everything.',
+        };
+        const hint = topicHints[contentType];
+        if (hint) {
+            dataBlock = `\n\nTOPIC GUIDANCE: ${hint}`;
+        }
+    }
+
+    const exclusionBlock = exclusions ? `\n\nAVOID REPEATING — here are recent posts (write something COMPLETELY DIFFERENT in topic and framing):\n${exclusions}` : '';
+
+    return `${brandInfo}\n\n${typeGuidance}\n\n${antiSlop}${dataBlock}${exclusionBlock}\n\nWrite the tweet now. Output ONLY the tweet text, nothing else.`;
 }
 
 /**
@@ -101,7 +135,7 @@ async function getRecentPostExclusions(): Promise<string> {
             .from('qasid_posts')
             .select('content')
             .order('posted_at', { ascending: false })
-            .limit(5);
+            .limit(10);
 
         if (error) {
             log.error('Error fetching recent posts for exclusion', { error: error.message });

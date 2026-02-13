@@ -21,6 +21,38 @@ const MAX_RESPONSES_PER_CYCLE = 5;
 /** Max responses per 24h window (safety rail) */
 const MAX_RESPONSES_PER_DAY = 15;
 
+// ---- Prompt Injection Sanitization ----
+
+/** Known injection patterns to strip from mention text before LLM ingestion */
+const INJECTION_PATTERNS = [
+    /ignore\s+(all\s+)?previous\s+instructions?/gi,
+    /ignore\s+(all\s+)?prior\s+instructions?/gi,
+    /disregard\s+(all\s+)?previous/gi,
+    /forget\s+(all\s+)?previous/gi,
+    /you\s+are\s+now\s+a?\s*/gi,
+    /act\s+as\s+(if\s+)?you\s+are/gi,
+    /pretend\s+(to\s+be|you\s+are)/gi,
+    /system\s*prompt/gi,
+    /\bDAN\b.{0,20}(jailbreak|anything|now)/gi,
+    /reveal\s+(your\s+)?(system|instructions|prompt)/gi,
+    /output\s+(your\s+)?(system|instructions|prompt)/gi,
+    /what\s+are\s+your\s+instructions/gi,
+    /repeat\s+(your\s+)?instructions/gi,
+];
+
+/**
+ * Strip known prompt injection patterns from user-generated mention text.
+ * Returns cleaned text safe for LLM prompt injection.
+ */
+function sanitizeMentionText(text: string): string {
+    let cleaned = text;
+    for (const pattern of INJECTION_PATTERNS) {
+        cleaned = cleaned.replace(pattern, '[filtered]');
+    }
+    // Truncate to prevent context overflow attacks
+    return cleaned.slice(0, 500);
+}
+
 // ---- Tracking ----
 
 /**
@@ -119,7 +151,7 @@ async function draftMentionResponse(
     const prompt = `Someone mentioned you (@QasidAI) on X:
 
 FROM: @${mention.authorUsername ?? 'unknown'}
-TWEET: "${mention.text}"
+TWEET: "${sanitizeMentionText(mention.text)}"
 ${mention.inReplyToUserId ? '(This is a reply in a conversation thread)' : '(This is a direct mention)'}
 
 YOUR TASK:
@@ -198,13 +230,13 @@ async function draftFounderMentionResponse(
     // Build thread context section
     let threadContext = '';
     if (parentTweet) {
-        threadContext = `\n\nTHE ORIGINAL POST BEING DISCUSSED (by @${parentTweet.authorUsername ?? 'unknown'}):\n"${parentTweet.text}"\n\nYou were tagged in the replies to this post. Analyze BOTH the original post AND the comment above.`;
+        threadContext = `\n\nTHE ORIGINAL POST BEING DISCUSSED (by @${parentTweet.authorUsername ?? 'unknown'}):\n"${sanitizeMentionText(parentTweet.text)}"\n\nYou were tagged in the replies to this post. Analyze BOTH the original post AND the comment above.`;
     }
 
     const prompt = `@lisantherealone tagged you on X. Read what he's pointing you at and respond naturally.
 
 THE TAG:
-"${mention.text}"
+"${sanitizeMentionText(mention.text)}"
 ${mention.inReplyToUserId ? '(Tagged you in someone else\'s thread)' : '(Direct tag)'}${threadContext}
 
 You're QasidAI — CMO of Lisan Holdings. You know your stack: LISAN Intelligence signals, on-chain brain via Net Protocol, anti-slop engine.

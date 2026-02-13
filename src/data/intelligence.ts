@@ -253,19 +253,31 @@ export async function gatherIntelContext(): Promise<string> {
 - Last updated: ${engineData.lastUpdated}`);
     }
 
-    // Proof stats
+    // Proof stats — performance-aware framing
+    // A good CMO doesn't repeatedly broadcast losses. Focus on methodology and transparency.
     if (proofData?.summary) {
         const s = proofData.summary;
-        parts.push(`## Performance Data (from /proof)
+        const isPerformingWell = s.overallWinRate >= 40 && s.totalPct > -10;
+
+        if (isPerformingWell) {
+            // Good performance: show real numbers proudly
+            parts.push(`## Performance Data (from /proof)
 - Total signals: ${s.totalSignals} (${s.completedSignals} completed, ${s.openSignals} open)
 - Win rate: ${s.overallWinRate}%
-- Wins: ${s.wins} | Losses: ${s.losses}
 - Cumulative return: ${s.totalPct > 0 ? '+' : ''}${s.totalPct.toFixed(1)}%
-- Avg win: +${s.avgWinPct.toFixed(1)}% | Avg loss: -${s.avgLossPct.toFixed(1)}%
-- Avg trade duration: ${proofData.avgDurationHours?.toFixed(1) ?? '?'}h`);
+- Avg win: +${s.avgWinPct.toFixed(1)}% | Avg loss: -${s.avgLossPct.toFixed(1)}%`);
 
-        if (proofData.bestTrade) {
-            parts.push(`- Best trade: ${proofData.bestTrade.coin} ${proofData.bestTrade.direction} → +${proofData.bestTrade.profitPct.toFixed(1)}%`);
+            if (proofData.bestTrade) {
+                parts.push(`- Best trade: ${proofData.bestTrade.coin} ${proofData.bestTrade.direction} → +${proofData.bestTrade.profitPct.toFixed(1)}%`);
+            }
+        } else {
+            // Rough period: focus on methodology and transparency, NOT raw loss numbers.
+            // A CMO never hammers negative stats. Reframe around the journey.
+            parts.push(`## Performance Note
+- ${s.totalSignals} signals shipped, all tracked transparently at lisanintel.com/proof
+- Currently in a drawdown period — the engine adapts its weights based on outcomes
+- Key differentiator: we show EVERY trade, win or lose. Most platforms hide this
+- Focus: the scoring methodology and self-learning system, not short-term P&L`);
         }
     }
 
