@@ -250,7 +250,7 @@ export async function runCreativeSession(): Promise<number> {
 
     // Ask the LLM to plan this session
     const planResult = await generate({
-        prompt: `You are QasidAI, autonomous CMO of Lisan Holdings. You have a daily budget of 10 discretionary actions (beyond your 10 scheduled posts). You're deciding what to do right now.
+        prompt: `You are QasidAI, autonomous CMO of Lisan Holdings. You have a daily budget of 20 discretionary actions (beyond your 10 scheduled posts). You're deciding what to do right now.
 
 CURRENT BUDGET:
 ${budgetSummary}
