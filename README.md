@@ -4,107 +4,69 @@
 
 Autonomous AI Chief Marketing Officer for [Lisan Holdings](https://lisanholdings.dev).
 
-Runs 24/7 — posts to [X](https://x.com/QasidAI_), cross-posts to [Botchan](https://netprotocol.app), with its brain stored permanently on-chain via [Net Protocol](https://netprotocol.app) on Base L2.
+Runs 24/7 — posts to [X](https://x.com/QasidAI_), engages on [Botchan](https://netprotocol.app), with its brain stored permanently on-chain via [Net Protocol](https://netprotocol.app) on Base L2.
 
 ---
 
-## What It Does
+## Capabilities
 
-- 🧠 **Generates original content** powered by live data from [LISAN INTELLIGENCE](https://lisanintel.com)
-- 📡 **Posts to X** on a 4x/day schedule — signal scorecards, builder narratives, market takes
-- ⛓️ **On-chain brain** — personality, brand knowledge, and daily summaries stored on Base L2
-- 📊 **Self-learning engine** — scores post performance, adapts content strategy weights weekly
-- 🔗 **Cross-posts to Botchan** — Net Protocol's on-chain social feed
+### Content & Distribution
+- 🧠 **10 daily X posts** — signal scorecards, builder narratives, market takes, product spotlights, performance recaps, and evening reflections, all powered by live data from [LISAN INTELLIGENCE](https://lisanintel.com)
+- 🧵 **Scheduled threads** — multi-tweet deep dives posted twice daily
+- 📝 **X Article generation** — weekly long-form articles stored for Premium publishing
+- 🎨 **AI image generation** — branded visuals via Replicate Flux, automatically attached to posts
+- ⛓️ **5 daily Botchan posts** — ecosystem insights, builder logs, tool spotlights, and agent capability shares on Net Protocol's on-chain feed
+
+### Social Intelligence
+- 💬 **Mention monitoring** — detects and responds to @QasidAI_ mentions every 30 minutes
+- 👑 **Founder VIP alerts** — monitors founder @lisantherealone mentions every 15 minutes with priority responses
+- 🔍 **Timeline scanning** — proactively finds and replies to relevant conversations 3x/day
+- 🎨 **Creative sessions** — 4x/day multi-format engagement cycles (timeline replies, Botchan commentary, trend responses)
+- 🤝 **Botchan engagement** — reads and responds to the on-chain feed every 3 hours
+- 👁️ **Founder tweet monitor** — tracks the founder's tweets to align messaging
+
+### Learning & Adaptation
+- 📊 **Self-learning engine** — scores post performance, adapts content type weights daily
+- 📈 **Weekly meta-reviews** — compares week-over-week strategy and adjusts approach
+- 🔍 **Skill discovery** — scans Botchan for new capabilities and proposes skill adoption (2x/day)
+- 👥 **Smart follow** — identifies and follows engaged users (warm leads)
+
+### Cross-Platform Flywheel
+- 🔗 **Thread → Botchan** — automatically cross-posts thread summaries to the on-chain feed
+- 🔗 **Botchan → X** — teases deep Botchan posts on X to drive cross-platform engagement
+
+### On-Chain Brain (Net Protocol)
+- 🧠 **Permanent memory** — personality, brand knowledge, documentation, and strategy snapshots stored on Base L2
+- 📋 **Daily summaries** — end-of-day activity logs saved on-chain for verifiability
+- 🔒 **On-chain OPSEC** — all uploads sanitized to strip secrets, API references, and infrastructure details before permanent storage
+- 🛡️ **Auto brain sync** — nightly synchronization keeps the on-chain brain current
+
+### Monitoring
+- 🌐 **Website monitor** — tracks changes to Lisan Holdings properties
+- 🐙 **GitHub monitor** — watches the LisanXG org for repos, commits, and activity
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| LLM | Anthropic Claude Haiku |
+| LLM | Anthropic Claude Haiku 4.5 (with prompt caching) |
 | Social | X (Twitter) API v2 |
+| Images | Replicate Flux API |
 | On-Chain | Net Protocol (Base L2) — Storage + Botchan |
 | Database | Supabase (PostgreSQL) |
 | Hosting | Railway |
 | Language | TypeScript / Node.js |
 
-## How It Works
+## Architecture
 
-QasidAI operates as a fully autonomous marketing agent:
+QasidAI operates as a fully autonomous agent — no human intervention needed after deployment:
 
-1. **Content Generation** — Pulls live market data and signal performance from LISAN INTELLIGENCE, then generates contextual posts using an LLM with a carefully crafted system prompt
-2. **Multi-Platform Distribution** — Posts to X and cross-posts to Botchan (Net Protocol's on-chain feed)
-3. **Learning Loop** — After 24 hours, scores each post's engagement (reactions, replies, clicks), adjusts content type weights, and runs weekly meta-reviews
-4. **On-Chain Memory** — Stores its personality, brand knowledge, strategy snapshots, and daily summaries on Base L2 via Net Protocol for permanent verifiability
-
-## Setup
-
-### 1. Install Dependencies
-
-```bash
-npm install
-```
-
-### 2. Configure Environment
-
-```bash
-cp .env.example .env
-# Edit .env with your API keys:
-#   ANTHROPIC_API_KEY     — Claude API key
-#   SUPABASE_URL          — Supabase project URL
-#   SUPABASE_ANON_KEY     — Supabase anon key
-#   SUPABASE_SERVICE_ROLE_KEY — Supabase service role key (server-side access)
-#   X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET — X API credentials
-#   NET_PRIVATE_KEY       — (optional) wallet private key for on-chain brain
-#   NET_ENABLED           — set to "true" to enable Net Protocol
-#   POSTING_ENABLED       — set to "true" to post live (default: dry run)
-```
-
-### 3. Run Supabase Migration
-
-Run `supabase/migration.sql` in your Supabase SQL editor to create the required tables.
-
-If updating an existing deployment, also run `supabase/migration-update.sql`.
-
-### 4. CLI Commands
-
-```bash
-# Development mode (hot reload)
-npm run dev
-
-# Test content generation (no posting)
-npm run dev -- test
-
-# Post once to X
-npm run dev -- once
-
-# Post once to X + Botchan
-npm run dev -- once-botchan
-
-# Post to Botchan feed
-npm run dev -- botchan-post <topic> <message>
-
-# Upload brain to Net Protocol
-npm run dev -- net-upload
-
-# Upload agent profile to Net Protocol
-npm run dev -- net-profile
-
-# Write daily summary to Net Protocol
-npm run dev -- net-summary
-
-# Check Net Protocol status
-npm run dev -- net-status
-
-# Read brain data from Net Protocol
-npm run dev -- net-read
-
-# Run tests
-npm test
-
-# Production build
-npm run build
-npm start
-```
+1. **Content Generation** — Pulls live market data and signal performance from LISAN Intelligence, generates contextual posts via LLM with a deeply crafted persona
+2. **Multi-Platform Distribution** — Posts to X and Botchan with cross-platform narrative linking
+3. **Social Engagement** — Monitors mentions, scans timelines, responds to conversations, and engages the Botchan feed
+4. **Learning Loop** — Scores engagement after 24 hours, adapts content type weights, runs weekly strategy meta-reviews
+5. **On-Chain Memory** — Stores personality, knowledge, strategy, and daily summaries on Base L2 for permanent verifiability
+6. **Security** — Input sanitization (12 injection patterns), output sanitization (secret blocklists), and on-chain write sanitization
 
 ## Links
 

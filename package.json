@@ -1,6 +1,7 @@
 {
   "name": "qasid-agent",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "description": "QasidAI — Autonomous AI CMO for Lisan Holdings. Posts to X, engages on Botchan, brain on-chain via Net Protocol.",
   "private": true,
   "type": "module",
   "scripts": {
