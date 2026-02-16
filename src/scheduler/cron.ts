@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { readFileSync } from 'fs';
 import { runFounderMentionCheck } from '../engine/mention-monitor.js';
 import { generatePost, generateThread, sanitizeContent } from '../engine/content.js';
 import { savePost, wasRecentlyPosted } from '../engine/memory.js';
@@ -604,7 +605,16 @@ export function startScheduler(): void {
                 const fullPersonality = dynKnowledge
                     ? `${personality}\n\n${dynKnowledge}`
                     : personality;
-                await uploadFullBrain(fullPersonality, brand);
+
+                // Read documentation file for Net storage sync
+                let documentation: string | undefined;
+                try {
+                    documentation = readFileSync('QASIDAI_DOCUMENTATION.txt', 'utf-8');
+                } catch {
+                    log.debug('Documentation file not found, skipping doc sync');
+                }
+
+                await uploadFullBrain(fullPersonality, brand, documentation);
                 log.info('🧠 Auto brain sync complete');
             } catch (error) {
                 log.error('Auto brain sync failed', { error: String(error) });
