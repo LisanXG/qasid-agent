@@ -52,7 +52,13 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
             model: 'claude-haiku-4-5-20251001',
             max_tokens: maxTokens,
             temperature,
-            system: systemPrompt,
+            // Prompt caching: system prompt (~9,700 tokens) stays cached for 5 min
+            // Cuts input cost from $1.00/MTok → $0.10/MTok for cached portion
+            system: [{
+                type: 'text' as const,
+                text: systemPrompt,
+                cache_control: { type: 'ephemeral' as const },
+            }],
             messages: [{ role: 'user', content: prompt }],
         });
 

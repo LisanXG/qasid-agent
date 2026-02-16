@@ -32,7 +32,7 @@ export async function runMetaReview(): Promise<WeeklyReport | null> {
     // Fetch this week's scored posts
     const { data: thisWeek, error: err1 } = await supabase
         .from('qasid_posts')
-        .select('content_type, platform, performance_score')
+        .select('content_type, platform, performance_score, reactions, replies')
         .not('performance_score', 'is', null)
         .gte('posted_at', thisWeekStart);
 
@@ -50,7 +50,25 @@ export async function runMetaReview(): Promise<WeeklyReport | null> {
     }
 
     if (!thisWeek || thisWeek.length < 3) {
-        log.info('Not enough data for meta review this week');
+        log.info('Not enough scored posts for meta review this week', {
+            scoredPosts: thisWeek?.length ?? 0,
+            required: 3,
+        });
+        return null;
+    }
+
+    // Data quality gate: check if engagement data is actually populated.
+    // If all posts have zero metrics, the scores are meaningless —
+    // likely because X API Free tier doesn't return public_metrics.
+    const postsWithRealMetrics = thisWeek.filter(
+        p => (p as any).reactions > 0 || (p as any).replies > 0
+    );
+    if (postsWithRealMetrics.length === 0) {
+        log.warn('⚠️ META_REVIEW_SKIPPED: All scored posts have zero engagement metrics', {
+            totalScored: thisWeek.length,
+            diagnosis: 'Scores are based on zero-metric data (likely X API Free tier limitation). ' +
+                'Meta review would report fabricated trends. Skipping until real metrics are available.',
+        });
         return null;
     }
 

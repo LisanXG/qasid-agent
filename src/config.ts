@@ -32,6 +32,9 @@ const envSchema = z.object({
         .optional(),
     NET_ENABLED: z.string().transform(v => v === 'true').default('false'),
 
+    // Image Generation (Replicate — Flux)
+    REPLICATE_API_TOKEN: z.string().optional(),
+
     // Agent Config
     POSTING_ENABLED: z.string().transform(v => v === 'true').default('false'),
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),

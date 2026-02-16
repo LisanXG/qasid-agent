@@ -208,23 +208,23 @@ Write ONLY the post text. Keep it conversational:`,
  */
 export async function runBotchanContentCycle(
     preferredType?: BotchanContentType,
-): Promise<boolean> {
+): Promise<{ text: string; topic: string; type: BotchanContentType } | null> {
     // Check Botchan budget before generating content
     const allowed = await canTakeAction('botchan_post');
     if (!allowed) {
         log.warn('Botchan budget exhausted — skipping content cycle');
-        return false;
+        return null;
     }
 
     const post = await generateBotchanPost(preferredType);
-    if (!post) return false;
+    if (!post) return null;
 
     try {
         // Reserve budget before posting
         const budgetOk = await recordAction('botchan_post', `Botchan ${post.type}: ${post.text.slice(0, 60)}`);
         if (!budgetOk) {
             log.warn('Botchan budget reservation failed — skipping post');
-            return false;
+            return null;
         }
 
         const txHash = await postToFeed(post.text, post.topic);
@@ -232,9 +232,9 @@ export async function runBotchanContentCycle(
             length: post.text.length,
             txHash,
         });
-        return true;
+        return { text: post.text, topic: post.topic, type: post.type };
     } catch (error) {
         log.error('Failed to post Botchan native content', { error: String(error) });
-        return false;
+        return null;
     }
 }

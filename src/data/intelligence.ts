@@ -248,10 +248,18 @@ export async function gatherIntelContext(): Promise<string> {
     // Market regime from engine data
     if (engineData) {
         const fgLabel = fearGreed?.label ?? getFearGreedLabel(engineData.fearGreed);
+
+        // Data freshness check
+        const lastUpdated = new Date(engineData.lastUpdated);
+        const ageHours = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60);
+        const freshnessNote = ageHours > 6
+            ? `\n- ⚠️ Data is ${ageHours.toFixed(0)}h old — do NOT quote specific numbers as "live" or "current"`
+            : '';
+
         parts.push(`## Market Regime
 - Current: ${engineData.regime} (confidence: ${(engineData.regimeConfidence * 100).toFixed(0)}%)
 - Fear & Greed: ${engineData.fearGreed} (${fgLabel})
-- Last updated: ${engineData.lastUpdated}`);
+- Last updated: ${engineData.lastUpdated}${freshnessNote}`);
     }
 
     // Proof stats — performance-aware framing
@@ -303,9 +311,28 @@ ${activeSignals.slice(0, 8).map(s => {
     // These ARE resolved trades with actual P&L. Only THESE can be called "wins" or "losses".
     if (proofData?.recentOutcomes?.length) {
         const recent = proofData.recentOutcomes.slice(0, 5);
+
+        // Compute actual streak from completed outcomes (most recent first)
+        let streakType: 'win' | 'loss' | 'none' = 'none';
+        let streakCount = 0;
+        for (const o of proofData.recentOutcomes) {
+            const isWin = o.outcome === 'WON';
+            if (streakCount === 0) {
+                streakType = isWin ? 'win' : 'loss';
+                streakCount = 1;
+            } else if ((isWin && streakType === 'win') || (!isWin && streakType === 'loss')) {
+                streakCount++;
+            } else {
+                break;
+            }
+        }
+        const streakNote = streakCount >= 2
+            ? `\nCurrent streak: ${streakCount} consecutive ${streakType === 'win' ? 'wins' : 'losses'} (verified from completed trades only)`
+            : '';
+
         parts.push(`## Recent COMPLETED Trade Outcomes (from /proof — these ARE resolved)
 These trades have ACTUALLY closed with a result. Only reference these when discussing wins, losses, or streaks.
-${recent.map(o => `- ${o.coin} ${o.direction}: ${o.outcome} (${o.profit_pct > 0 ? '+' : ''}${o.profit_pct.toFixed(1)}%) via ${o.exit_reason}`).join('\n')}`);
+${recent.map(o => `- ${o.coin} ${o.direction}: ${o.outcome} (${o.profit_pct > 0 ? '+' : ''}${o.profit_pct.toFixed(1)}%) via ${o.exit_reason}`).join('\n')}${streakNote}`);
     }
 
     // Top market movers

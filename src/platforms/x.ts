@@ -59,6 +59,36 @@ export async function postTweet(text: string): Promise<string | null> {
 }
 
 /**
+ * Post a quote tweet (retweet with commentary). Returns the tweet ID.
+ */
+export async function quoteTweet(text: string, quotedTweetId: string): Promise<string | null> {
+    if (!config.POSTING_ENABLED) {
+        log.info('[DRY RUN] Would post quote tweet:', { text, quotedTweetId });
+        return `dry-run-${Date.now()}`;
+    }
+
+    try {
+        const result = await getClient().v2.tweet(text, { quote_tweet_id: quotedTweetId });
+        log.info('Quote tweet posted', { id: result.data.id, quotedTweetId });
+        return result.data.id;
+    } catch (error: any) {
+        if (error?.code === 429 || error?.data?.status === 429) {
+            log.warn('Rate limited on quote tweet, retrying in 60s...');
+            await new Promise(resolve => setTimeout(resolve, 60_000));
+            try {
+                const retry = await getClient().v2.tweet(text, { quote_tweet_id: quotedTweetId });
+                log.info('Quote tweet posted (after retry)', { id: retry.data.id });
+                return retry.data.id;
+            } catch (retryError) {
+                log.error('Failed to post quote tweet after retry', { error: String(retryError) });
+                return null;
+            }
+        }
+        log.error('Failed to post quote tweet', { error: String(error) });
+        return null;
+    }
+}
+/**
  * Post a thread (array of tweets). Returns the IDs of all tweets.
  */
 export async function postThread(tweets: string[]): Promise<string[]> {

@@ -490,6 +490,20 @@ export async function processSkillApproval(
             .update({ status: 'active' })
             .eq('id', pendingSkill.id);
         log.info(`✅ Skill APPROVED by founder: ${pendingSkill.name}`);
+
+        // Public announcement: skill activated
+        try {
+            await postTweet(`✅ New skill activated: ${pendingSkill.name}\n\n${pendingSkill.description}\n\nFounder approved. Deploying now. 🧠`);
+        } catch {
+            log.warn('Failed to post skill approval announcement');
+        }
+
+        // Sync active skills to on-chain storage
+        try {
+            await syncSkillsToChain();
+        } catch {
+            log.warn('Failed to sync skills to chain after approval');
+        }
     } else if (denied) {
         pendingSkill.status = 'denied';
         await supabase
@@ -497,6 +511,13 @@ export async function processSkillApproval(
             .update({ status: 'denied' })
             .eq('id', pendingSkill.id);
         log.info(`❌ Skill DENIED by founder: ${pendingSkill.name}`);
+
+        // Public announcement: skill denied (clean, professional)
+        try {
+            await postTweet(`Skill proposal "${pendingSkill.name}" — reviewed and shelved by founder. Not every capability makes the cut. Moving on.`);
+        } catch {
+            log.warn('Failed to post skill denial announcement');
+        }
     } else {
         // Ambiguous response — leave pending
         log.info(`🤷 Ambiguous founder reply for skill ${pendingSkill.name}: "${replyText}"`);

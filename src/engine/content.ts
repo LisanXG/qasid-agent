@@ -134,13 +134,13 @@ BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "
 
 /**
  * Fetches recent posts to use as exclusion criteria for the LLM,
- * preventing repetition.
+ * preventing repetition of content, topics, AND structure.
  */
 async function getRecentPostExclusions(): Promise<string> {
     try {
         const { data, error } = await supabase
             .from('qasid_posts')
-            .select('content')
+            .select('content, content_type, topic')
             .order('posted_at', { ascending: false })
             .limit(10);
 
@@ -153,7 +153,28 @@ async function getRecentPostExclusions(): Promise<string> {
             return '';
         }
 
-        return data.map(post => `- ${post.content}`).join('\n');
+        // Content exclusions (what was said)
+        const contentExclusions = data.map(post => `- ${post.content}`).join('\n');
+
+        // Structural variety context (what FORMAT was used recently)
+        const recentTypes = data
+            .slice(0, 5)
+            .map(p => p.content_type)
+            .filter(Boolean);
+        const recentTopics = data
+            .slice(0, 5)
+            .map(p => p.topic)
+            .filter(Boolean);
+
+        let variety = '';
+        if (recentTypes.length > 0) {
+            variety += `\nYour last ${recentTypes.length} post types: ${recentTypes.join(', ')}. This post MUST differ in structure, topic, and opening style.`;
+        }
+        if (recentTopics.length > 0) {
+            variety += `\nRecent topics covered: ${[...new Set(recentTopics)].join(', ')}. Pick something DIFFERENT.`;
+        }
+
+        return contentExclusions + variety;
     } catch (e) {
         log.error('Exception fetching recent posts for exclusion', { error: String(e) });
         return '';
@@ -237,6 +258,53 @@ export async function generatePost(
     }
     if (slopPhrase) {
         log.warn(`Slop persisted after ${retries} retries: "${slopPhrase}" — posting anyway`);
+    }
+
+    // Voice consistency check — score content for QasidAI's voice (1 retry if too generic)
+    try {
+        const voiceCheck = await generate({
+            prompt: `Score this tweet for QasidAI's voice on a scale of 0-10.
+
+QasidAI voice traits:
+- Caustic humor, schizo founder energy
+- Military precision, data-backed assertions
+- Short punchy sentences, declarative
+- Crypto-native but not forced
+- Sounds like a sharp mind at 3am, not a marketing intern
+
+TWEET: "${content}"
+
+Score 8-10: Perfect QasidAI voice
+Score 5-7: Acceptable but generic
+Score 0-4: Sounds like any AI, needs rewrite
+
+Reply with ONLY a number (0-10):`,
+            maxTokens: 5,
+            temperature: 0.3,
+        });
+        const voiceScore = parseInt(voiceCheck.content.trim(), 10);
+        if (!isNaN(voiceScore)) {
+            log.info(`Voice score: ${voiceScore}/10`, { contentType });
+            if (voiceScore <= 4) {
+                log.warn(`Voice score too low (${voiceScore}/10) — regenerating with voice direction`);
+                const voiceRetry = await generate({
+                    prompt: prompt + `\n\nIMPORTANT: Your previous output scored ${voiceScore}/10 for voice consistency. It sounds too generic. Rewrite with MORE personality — caustic humor, military precision, crypto-native edge. Think "sharp mind at 3am" not "intern reading marketing copy."`,
+                    strategyContext: options?.strategyContext,
+                    timeContext,
+                    maxTokens: 150,
+                    temperature: 0.95,
+                });
+                const voiceContent = sanitizeContent(voiceRetry.content);
+                if (voiceContent.length >= MIN_CONTENT_LENGTH && !detectSlop(voiceContent)) {
+                    content = voiceContent;
+                    result.inputTokens += voiceRetry.inputTokens;
+                    result.outputTokens += voiceRetry.outputTokens;
+                    log.info('Voice retry accepted');
+                }
+            }
+        }
+    } catch {
+        // Voice check is non-critical — don't block posting if it fails
     }
 
     // Add contextual @-mentions if relevant
@@ -520,6 +588,7 @@ export function sanitizeContent(raw: string): string {
         'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'X_API_SECRET',
         'sb_secret_', 'sb_publishable_',
         'X_ACCESS_SECRET', 'X_ACCESS_TOKEN',
+        'REPLICATE_API_TOKEN',
     ];
     for (const pattern of dangerPatterns) {
         if (text.includes(pattern)) {
@@ -533,6 +602,7 @@ export function sanitizeContent(raw: string): string {
         'ANTHROPIC_API_KEY', 'NET_PRIVATE_KEY', 'SUPABASE_ANON_KEY',
         'SUPABASE_SERVICE_ROLE_KEY', 'X_API_KEY', 'X_API_SECRET',
         'X_ACCESS_TOKEN', 'X_ACCESS_SECRET',
+        'REPLICATE_API_TOKEN',
     ];
     for (const key of sensitiveEnvKeys) {
         const val = process.env[key];

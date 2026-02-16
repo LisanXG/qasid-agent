@@ -123,5 +123,108 @@ Answer YES or NO (one word):`,
     }
 
     log.info(`🔍 Skill scout complete: ${proposed} skill(s) proposed`);
+
+    // Cross-agent skill discovery from Botchan feeds
+    const botchanProposed = await runBotchanSkillScout();
+    proposed += botchanProposed;
+
+    return proposed;
+}
+
+// ---- Cross-Agent Skill Discovery from Botchan ----
+
+import { execFileSync } from 'node:child_process';
+import { config } from '../config.js';
+import { isNetConfigured } from '../config.js';
+
+interface BotchanPost {
+    index: number;
+    sender: string;
+    text: string;
+    timestamp: number;
+    topic?: string;
+}
+
+/** In-memory tracking to avoid re-evaluating posts */
+const evaluatedBotchanPosts = new Set<string>();
+
+/**
+ * Scan Botchan feeds for skills shared by other agents.
+ * Looks for posts about capabilities, techniques, and tools.
+ */
+async function runBotchanSkillScout(): Promise<number> {
+    if (!isNetConfigured) return 0;
+
+    let proposed = 0;
+
+    try {
+        const env = {
+            ...process.env,
+            BOTCHAN_PRIVATE_KEY: config.NET_PRIVATE_KEY,
+            BOTCHAN_CHAIN_ID: '8453',
+        };
+
+        let feedPosts: BotchanPost[] | null = null;
+        try {
+            const output = execFileSync('npx', [
+                'botchan', 'read', 'agent-finance', '--limit', '10', '--json',
+            ], {
+                env,
+                timeout: 30_000,
+                encoding: 'utf-8',
+                stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            feedPosts = JSON.parse(output.trim()) as BotchanPost[];
+        } catch {
+            log.debug('Could not read Botchan agent-finance feed');
+            return 0;
+        }
+
+        if (!feedPosts || feedPosts.length === 0) return 0;
+
+        // Filter: recent, not already evaluated, has substance
+        const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
+        const candidates = feedPosts.filter(p => {
+            const postId = `${p.sender}:${p.index}`;
+            return p.timestamp > oneDayAgo
+                && p.text.length > 50
+                && !evaluatedBotchanPosts.has(postId);
+        });
+
+        for (const post of candidates.slice(0, 3)) {
+            const postId = `${post.sender}:${post.index}`;
+            evaluatedBotchanPosts.add(postId);
+
+            // LLM pre-filter: does this describe a learnable skill/technique?
+            const prescreen = await generate({
+                prompt: `You're QasidAI, scanning Botchan (on-chain agent feed) for skills to learn.
+
+POST by agent ${post.sender.slice(0, 10)}...:
+"${post.text.slice(0, 500)}"
+
+Does this post describe a SPECIFIC technique, tool, or capability that could become a reusable skill for an AI marketing agent?
+
+Answer YES or NO (one word):`,
+                maxTokens: 5,
+                temperature: 0.2,
+            });
+
+            if (!prescreen.content.trim().toUpperCase().startsWith('YES')) continue;
+
+            // Pass to skill discovery pipeline (source: botchan)
+            const skill = await discoverSkillFromContent(post.text, 'botchan');
+            if (skill) {
+                proposed++;
+                log.info('🔍 Skill proposed from Botchan feed', {
+                    skill: skill.name,
+                    agent: post.sender.slice(0, 10),
+                });
+                if (proposed >= 1) break; // Max 1 from Botchan per run
+            }
+        }
+    } catch (error) {
+        log.warn('Botchan skill scout failed', { error: String(error) });
+    }
+
     return proposed;
 }

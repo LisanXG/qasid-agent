@@ -1,12 +1,14 @@
 import { generate } from './llm.js';
 import { generatePost, generateThread, sanitizeContent } from './content.js';
-import { searchRecentTweets, replyToTweet, getMentions, postThread, postTweetWithImage, type SearchResult, type MentionTweet } from '../platforms/x.js';
+import { searchRecentTweets, replyToTweet, getMentions, postThread, postTweetWithImage, quoteTweet, type SearchResult, type MentionTweet } from '../platforms/x.js';
 import { generateScorecardImage } from './scorecard-image.js';
+import { generateScrollStopper, isImageGenConfigured } from './image-gen.js';
 import { gatherIntelContext } from '../data/intelligence.js';
 import { getDiscretionaryRemaining, recordAction, getBudgetSummary } from './daily-budget.js';
 import { hasRepliedTo, recordReply, getLastMentionId } from './reply-tracker.js';
 import { createLogger } from '../logger.js';
 import { sanitizeUserInput } from './sanitize-input.js';
+import { getSkillsSummary } from '../skills/skill-manager.js';
 
 // ============================================================================
 // QasidAI — Creative Session
@@ -23,6 +25,9 @@ const AVAILABLE_ACTIONS = [
     'BONUS_POST — Post extra original content (a thought, hot take, or observation)',
     'THREAD — Post a multi-tweet thread (3-5 tweets) diving deep into a topic',
     'IMAGE_POST — Post a signal scorecard image with live data',
+    'AI_IMAGE — Generate an AI image with a hot take (eye-catching scroll-stopper)',
+    'QUOTE_TWEET — Quote tweet an interesting post with sharp commentary',
+    'ASK_QUESTION — Post a thoughtful question to spark conversation and build relationships',
     'SKIP — Save the remaining budget (no more actions this session)',
 ];
 // ---- Action Executors ----
@@ -219,6 +224,156 @@ async function executeImagePost(): Promise<boolean> {
     return false;
 }
 
+/**
+ * Execute an AI_IMAGE action.
+ * Generates an AI image with a scroll-stopping hot take.
+ * Falls back to scorecard image if Replicate isn't configured.
+ */
+async function executeAiImage(): Promise<boolean> {
+    if (!isImageGenConfigured()) {
+        log.info('Image gen not configured, falling back to scorecard');
+        return executeImagePost();
+    }
+
+    const scrollStopper = await generateScrollStopper();
+    if (!scrollStopper) {
+        log.warn('Scroll stopper generation failed, falling back to scorecard');
+        return executeImagePost();
+    }
+
+    const budgetOk = await recordAction('bonus_post', `AI Image: ${scrollStopper.text.slice(0, 60)}`);
+    if (!budgetOk) {
+        log.warn('Budget reservation failed — skipping AI image');
+        return false;
+    }
+
+    const tweetId = await postTweetWithImage(scrollStopper.text, scrollStopper.image.buffer, scrollStopper.image.mimeType);
+    if (tweetId) {
+        log.info('✅ AI image posted', { tweetId });
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Execute a QUOTE_TWEET action.
+ * Finds an interesting tweet and quote-tweets it with sharp commentary.
+ */
+async function executeQuoteTweet(intelContext: string): Promise<boolean> {
+    const queries = [
+        '"AI agent" crypto -is:retweet lang:en',
+        '"on-chain" AI -is:retweet lang:en',
+        '"autonomous agent" -is:retweet lang:en',
+        'crypto marketing AI -is:retweet lang:en',
+        '"win rate" trading -is:retweet lang:en',
+    ];
+    const query = queries[Math.floor(Math.random() * queries.length)];
+
+    const tweets = await searchRecentTweets(query, 10);
+    // Prefer tweets with some engagement but not too crowded
+    const candidates = tweets.filter(t =>
+        (t.metrics?.like_count ?? 0) >= 3 &&
+        (t.metrics?.quote_count ?? 0) < 10
+    );
+
+    for (const tweet of candidates.slice(0, 3)) {
+        if (await hasRepliedTo(tweet.id)) continue;
+
+        const result = await generate({
+            prompt: `You found this tweet while browsing crypto twitter:
+
+TWEET by @${tweet.authorUsername ?? 'unknown'}: "${sanitizeUserInput(tweet.text)}"
+Likes: ${tweet.metrics?.like_count ?? 0} | Quotes: ${tweet.metrics?.quote_count ?? 0}
+
+Draft sharp quote tweet commentary (under 280 chars). Add your own perspective — agree, disagree, expand, or offer a contrarian take. Reference Lisan Holdings' experience if relevant. If this tweet isn't worth quoting, respond with just "SKIP".
+
+MARKET CONTEXT: ${intelContext.slice(0, 300)}
+
+Reply with ONLY the commentary (or "SKIP"):`,
+            maxTokens: 100,
+            temperature: 0.9,
+        });
+
+        let commentary = result.content.trim().replace(/^["']|["']$/g, '');
+        if (commentary.toUpperCase().startsWith('SKIP') || commentary.length < 5) continue;
+        commentary = sanitizeContent(commentary);
+
+        const budgetOk = await recordAction('reply', `Quote @${tweet.authorUsername}: ${commentary.slice(0, 60)}`);
+        if (!budgetOk) {
+            log.warn('Budget reservation failed — skipping quote tweet');
+            continue;
+        }
+
+        const qtId = await quoteTweet(commentary, tweet.id);
+        if (qtId) {
+            await recordReply(tweet.id, tweet.authorUsername ?? tweet.authorId, qtId, commentary, 'creative-quote');
+            log.info('✅ Quote tweet posted', { target: tweet.id, author: tweet.authorUsername });
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Execute an ASK_QUESTION action.
+ * Posts a thoughtful question to spark conversation and build relationships.
+ */
+async function executeAskQuestion(intelContext: string): Promise<boolean> {
+    const result = await generate({
+        prompt: `You are QasidAI, autonomous CMO of Lisan Holdings. You want to start a conversation on crypto twitter.
+
+Post a genuine, thought-provoking question about one of these topics:
+- How AI agents are changing crypto marketing
+- The future of on-chain identity and reputation for AI agents
+- Whether autonomous agents should have transparent strategy weights
+- The difference between "AI-powered" and truly autonomous agents
+- Solo builder vs. VC-funded team dynamics in crypto
+- What traders actually want from signal platforms
+
+MARKET CONTEXT: ${intelContext.slice(0, 300)}
+
+Rules:
+- Make it a REAL question, not rhetorical
+- Keep it under 280 chars
+- Don't tag anyone — let the question stand on its own
+- Make people want to reply
+- Don't sound like a survey
+
+Reply with ONLY the question:`,
+        maxTokens: 100,
+        temperature: 0.9,
+    });
+
+    let question = result.content.trim().replace(/^["']|["']$/g, '');
+    question = sanitizeContent(question);
+    if (question.length < 10) return false;
+
+    const budgetOk = await recordAction('bonus_post', `Question: ${question.slice(0, 60)}`);
+    if (!budgetOk) {
+        log.warn('Budget reservation failed — skipping question');
+        return false;
+    }
+
+    const { postTweet } = await import('../platforms/x.js');
+    const tweetId = await postTweet(question);
+    if (tweetId) {
+        const { savePost } = await import('../engine/memory.js');
+        await savePost({
+            content: question,
+            contentType: 'engagement_bait',
+            platform: 'x',
+            tone: 'curious',
+            topic: 'conversation-starter',
+            inputTokens: 0,
+            outputTokens: 0,
+            generatedAt: new Date().toISOString(),
+        }, tweetId);
+        log.info('✅ Question posted', { tweetId });
+        return true;
+    }
+    return false;
+}
+
 // ---- Main Creative Session ----
 
 /**
@@ -263,6 +418,9 @@ CURRENT TIME: ${new Date().toUTCString()}
 MARKET CONTEXT:
 ${intelContext.slice(0, 400)}
 
+ACTIVE SKILLS:
+${getSkillsSummary() || 'No learned skills yet.'}
+
 As a creative CMO, decide what to do this session. Think about:
 - What would have the most impact right now?
 - What haven't you done recently?
@@ -289,8 +447,10 @@ Just the action names, one per line. No explanation needed:`,
         else if (cleaned.startsWith('REPLY_MENTION')) actions.push('REPLY_MENTION');
         else if (cleaned.startsWith('BONUS_POST') || cleaned.startsWith('BONUS')) actions.push('BONUS_POST');
         else if (cleaned.startsWith('THREAD')) actions.push('THREAD');
-        else if (cleaned.startsWith('IMAGE')) actions.push('IMAGE_POST');
-        else if (cleaned.startsWith('QUOTE')) actions.push('QUOTE_COMMENT');
+        else if (cleaned.startsWith('IMAGE_P')) actions.push('IMAGE_POST');
+        else if (cleaned.startsWith('AI_IMAGE') || cleaned === 'IMAGE') actions.push('AI_IMAGE');
+        else if (cleaned.startsWith('QUOTE')) actions.push('QUOTE_TWEET');
+        else if (cleaned.startsWith('ASK')) actions.push('ASK_QUESTION');
         else if (cleaned.startsWith('SKIP')) break; // Stop planning
     }
 
@@ -326,6 +486,15 @@ Just the action names, one per line. No explanation needed:`,
                     break;
                 case 'IMAGE_POST':
                     success = await executeImagePost();
+                    break;
+                case 'QUOTE_TWEET':
+                    success = await executeQuoteTweet(intelContext);
+                    break;
+                case 'ASK_QUESTION':
+                    success = await executeAskQuestion(intelContext);
+                    break;
+                case 'AI_IMAGE':
+                    success = await executeAiImage();
                     break;
             }
             if (success) executed++;

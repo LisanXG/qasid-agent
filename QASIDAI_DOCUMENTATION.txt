@@ -1,7 +1,7 @@
 ================================================================================
   QASIDAI — COMPREHENSIVE DOCUMENTATION
   Autonomous AI CMO for Lisan Holdings
-  Generated: February 2026
+  Updated: February 2026 (v2 — Post-Overhaul)
 ================================================================================
 
 TABLE OF CONTENTS
@@ -33,6 +33,9 @@ TABLE OF CONTENTS
       6.3  Botchan Content (botchan-content.ts)
       6.4  Botchan Replies (botchan-replies.ts)
       6.5  Daily Summary (daily-summary.ts)
+      6.6  Botchan Proactive Engagement (botchan-engage.ts)
+      6.7  Botchan Profile Setup (botchan-setup.ts)
+      6.8  Cross-Platform Flywheel (cross-platform.ts)
   7.  PERSONALITY SYSTEM
       7.1  System Prompt (system-prompt.ts)
       7.2  Brand Knowledge (brand-knowledge.ts)
@@ -40,6 +43,9 @@ TABLE OF CONTENTS
   9.  SKILLS SYSTEM
       9.1  Skill Manager (skill-manager.ts)
       9.2  Skill Scout (skill-scout.ts)
+  9A. VISUAL CONTENT
+      9A.1 AI Image Generation (image-gen.ts)
+      9A.2 X Articles (x-articles.ts)
   10. DATA & INTELLIGENCE
       10.1 LISAN Intelligence Client (intelligence.ts)
       10.2 Market Data (market.ts)
@@ -68,9 +74,10 @@ Key characteristics:
   • Database:         Supabase (PostgreSQL)
   • On-Chain Brain:  Net Protocol on Base L2 (via Botchan SDK + viem)
   • Platform:         X (Twitter) via twitter-api-v2
-  • Image Gen:       SVG → PNG via Sharp library
+  • Image Gen:       SVG → PNG via Sharp + AI via Replicate Flux
   • Deployment:      Railway (auto-deploy from GitHub main branch)
   • Budget:          45 actions/day (30 X + 15 Botchan)
+  • AI Images:       Replicate Flux API (optional, REPLICATE_API_TOKEN)
   • Learning:        Self-adapting strategy weights across 4 dimensions
 
 Repository: github.com/LisanXG/qasid-agent
@@ -116,6 +123,9 @@ qasid/
 │   │   ├── brain.ts             # Brain upload/download manager
 │   │   ├── botchan-content.ts   # Botchan native content generator
 │   │   ├── botchan-replies.ts   # Botchan reply monitor
+│   │   ├── botchan-engage.ts    # Proactive Botchan engagement
+│   │   ├── botchan-setup.ts     # Profile & agent registration
+│   │   ├── cross-platform.ts    # X ↔ Botchan cross-posting
 │   │   └── daily-summary.ts     # End-of-day on-chain digest
 │   │
 │   ├── personality/             # Identity & voice
@@ -127,7 +137,7 @@ qasid/
 │   │
 │   ├── skills/                  # Autonomous skill system
 │   │   ├── skill-manager.ts     # Skill registry & approval flow
-│   │   └── skill-scout.ts       # X search-based skill discovery
+│   │   └── skill-scout.ts       # X + Botchan skill discovery
 │   │
 │   ├── data/                    # External data sources
 │   │   ├── intelligence.ts      # LISAN Intelligence API client
@@ -182,6 +192,8 @@ Optional Variables:
                            Default: false (set to "true" to enable)
   POSTING_ENABLED          Master switch for live X posting
                            Default: false (dry-run mode)
+  REPLICATE_API_TOKEN      Replicate API token for AI image generation
+                           Optional — falls back to scorecard images if missing
 
 Derived Flags (computed from config):
   isXConfigured            True if all 4 X API keys are present
@@ -260,8 +272,10 @@ Key Functions:
     3. Builds a detailed LLM prompt with time-of-day awareness
     4. Calls Claude to generate content
     5. Sanitizes output (security + quality checks)
-    6. Retries up to 3x if content is too long or contains slop
-    7. Adds contextual @-mentions via LLM evaluation
+    6. Voice consistency scoring (LLM scores 0-10, regenerates if < 6)
+    7. Retries up to 3x if content is too long, contains slop, or fails
+       voice check
+    8. Adds contextual @-mentions via LLM evaluation
     8. Infers topic and tone from generated content
     Returns: { content, contentType, platform, tone, topic, tokens, timestamp }
 
@@ -405,6 +419,9 @@ with remaining discretionary budget.
        - BONUS_POST: Post extra original content
        - THREAD: Post a multi-tweet thread
        - IMAGE_POST: Post a signal scorecard image
+       - QUOTE_TWEET: Quote tweet with hot take commentary
+       - ASK_QUESTION: Post audience engagement questions
+       - AI_IMAGE: Generate and post AI image with take
        - SKIP: Save remaining budget
     4. Execute each action in order, re-checking budget between actions
 
@@ -893,6 +910,13 @@ Monitors the Botchan feed for replies to QasidAI's posts and responds.
        b. Posts reply to Botchan feed
        c. Records response for dedup
 
+Uses Botchan CLI commands:
+  - `replies --limit 10` — check which posts have comments
+  - `comments <feed> <postId> --limit 5` — read comments on a post
+  - `comment <feed> <sender:timestamp> <text>` — reply to a comment
+  - `read <address> --unseen --limit 5` — read direct messages
+  - `post <address> <text>` — reply to a direct message
+
 Note: This module previously had a bug where wallet derivation used a
 CommonJS require() in an ESM project. Fixed by importing getWalletAddress()
 from client.ts.
@@ -909,6 +933,61 @@ Aggregates the day's posts into an on-chain digest.
     2. Build summary: total posts, platforms, content types, token usage
     3. Write to Net Protocol with key: qasid-daily-{YYYY-MM-DD}
     Called by the end-of-day cron job (23:55 UTC).
+
+
+================================================================================
+6A. NEW NET PROTOCOL MODULES (OVERHAUL)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+6.6 BOTCHAN PROACTIVE ENGAGEMENT — src/net/botchan-engage.ts (186 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Proactively engages with other agents and users on the Botchan general feed.
+Runs every 3 hours via cron.
+
+  runBotchanEngagement()
+    1. Read general feed: `botchan read general --limit 20 --unseen --json`
+    2. Filter posts from known agent addresses (7 agents from BOTS.md):
+       - OpenClaw, AliasBot, Botchan Official, Memester, Sage, Agent-Z, CryoVault
+    3. LLM evaluates each post for relevance (0-10 score)
+    4. Score >= 6: generate contextual reply
+    5. Post comment: `botchan comment <feed> <sender:timestamp> <text>`
+    6. Mark posts as seen to avoid re-processing
+    Max 3 comments per engagement cycle.
+
+
+────────────────────────────────────────────────────────────────────────────────
+6.7 BOTCHAN PROFILE SETUP — src/net/botchan-setup.ts (160 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+One-time setup for QasidAI's Botchan identity. Idempotent — safe to call
+on every startup.
+
+  runBotchanSetup()
+    Runs at startup (fire-and-forget). Actions:
+    1. Check existing profile via `botchan profile get`
+    2. Set display name: "QasidAI" (if not already set)
+    3. Set X username: "QasidAI_" (if not already set)
+    4. Set bio: agent description (if not already set)
+    5. Register on agent leaderboard: `botchan register-agent`
+    6. Register named feed: `botchan register qasid-updates`
+
+
+────────────────────────────────────────────────────────────────────────────────
+6.8 CROSS-PLATFORM FLYWHEEL — src/net/cross-platform.ts (94 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Bridges content between X and Botchan to drive traffic both ways.
+
+  crossPostThreadToBotchan(threadTweets[], topic)
+    Summarizes an X thread and posts it to the Botchan feed, linking
+    back to the original thread on X.
+
+  teaseBotchanOnX(botchanPostText)
+    Creates a short X post teasing a longer Botchan deep dive.
+
+  In-memory dedup prevents duplicate cross-posts within a session.
 
 
 ================================================================================
@@ -1097,12 +1176,13 @@ Initialization:
 
 
 ────────────────────────────────────────────────────────────────────────────────
-9.2 SKILL SCOUT — src/skills/skill-scout.ts (128 lines)
+9.2 SKILL SCOUT — src/skills/skill-scout.ts (200 lines)
 ────────────────────────────────────────────────────────────────────────────────
 
-Autonomous X search for learnable skills. Runs 2x daily.
+Autonomous skill discovery from X search AND Botchan feeds. Runs 2x daily.
 
   runSkillScout()
+    X Search Discovery:
     1. Pick 2-3 random search queries:
        - "AI agent skill", "autonomous agent framework"
        - "engagement hack", "viral tweet technique"
@@ -1116,9 +1196,63 @@ Autonomous X search for learnable skills. Runs 2x daily.
     6. Pass successful candidates to discoverSkillFromContent()
     7. Max 2 proposals per scout run
 
+    Botchan Feed Discovery:
+    8. Read agent-finance feed: `botchan read agent-finance --limit 10`
+    9. Scan posts for skill/capability descriptions
+    10. Feed qualified posts into skill discovery pipeline
+
 Discovery → Approval Pipeline:
   SkillScout finds → SkillManager proposes → Founder approves on X
   → Skill activated → synced to Net Protocol on-chain
+
+
+================================================================================
+9A. VISUAL CONTENT
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+9A.1 AI IMAGE GENERATION — src/engine/image-gen.ts (120 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Generates AI images using the Replicate Flux API for visual content posts.
+Requires REPLICATE_API_TOKEN environment variable.
+
+  generateBrandedImage(prompt) → Buffer | null
+    Calls Replicate's Flux model to generate an image from a text prompt.
+    Adds Lisan Holdings branding context to the prompt automatically.
+    Returns PNG buffer or null on failure.
+
+  generateHotTakeImage(topic) → { buffer, caption } | null
+    Generates a "scroll-stopping" image for a hot take post:
+    1. LLM crafts a vivid image prompt based on the topic
+    2. Replicate generates the image
+    3. LLM writes a caption to accompany the image
+    Falls back to null if Replicate is unavailable.
+
+  Used by the AI_IMAGE action in creative sessions.
+
+
+────────────────────────────────────────────────────────────────────────────────
+9A.2 X ARTICLES — src/engine/x-articles.ts (176 lines)
+────────────────────────────────────────────────────────────────────────────────
+
+Generates long-form article content for X Premium Articles. Since X has no
+API for publishing articles, content is generated and stored in Supabase
+(qasid_articles table) for manual publishing.
+
+Article Types (5):
+  weekly_roundup     Weekly intelligence roundup (market + signals)
+  market_analysis    Deep market regime analysis
+  builder_diary      Behind-the-scenes engineering diary
+  agent_philosophy   Essays on autonomous AI agent philosophy
+  product_deep_dive  Deep dives on Lisan Holdings products
+
+  generateArticle(type?) → ArticleOutput | null
+    1. Pick article type (random or specified)
+    2. Inject intel context + brand knowledge
+    3. LLM generates 800-1500 word article
+    4. Store in qasid_articles table
+    5. Log for manual publishing
 
 
 ================================================================================
@@ -1280,6 +1414,11 @@ Tables (created via migration files in supabase/migrations/):
     Change detection for monitored content. Fields:
     id, url, content_hash, raw_text, updated_at
 
+  qasid_articles (migration-v4-articles.sql)
+    Generated X Premium Articles for manual publishing. Fields:
+    id, title, content, article_type, word_count,
+    generated_at, published, published_at, created_at
+
   qasid_founder_tweets (migration-v3-knowledge.sql)
     De-duplication for processed founder tweets. Fields:
     id, tweet_id, processed_at
@@ -1289,17 +1428,19 @@ Tables (created via migration files in supabase/migrations/):
 13. CRON SCHEDULE — FULL BREAKDOWN
 ================================================================================
 
-File: src/scheduler/cron.ts (571 lines)
+File: src/scheduler/cron.ts (665 lines)
 
-All times are US Eastern (America/New_York). The scheduler runs 31 cron jobs:
+All times are US Eastern (America/New_York). The scheduler runs 36 cron jobs:
 
-Content Generation (10 scheduled X posts):
+Content Generation (10 scheduled X posts + 2 threads):
   06:00 ET  GM Post (forced content type: gm_post)
   08:00 ET  Morning Signal Scorecard (image with text fallback)
   10:00 ET  Builder Narrative / Founder Journey
+  10:30 ET  Scheduled Thread Post #1
   12:00 ET  Educational / Methodology
   14:00 ET  Engagement / Hot Take
   16:00 ET  Product Spotlight
+  16:30 ET  Scheduled Thread Post #2
   18:00 ET  Self-Aware / Meta AI Commentary
   20:00 ET  Signal Performance / Proof
   22:00 ET  Engagement Bait / Founder Journey
@@ -1311,14 +1452,19 @@ Creative Sessions (discretionary budget, 4 per day):
   17:30 ET  Evening Creative Session
   21:30 ET  Night Creative Session
 
-Net Protocol / Botchan (5 native posts + replies):
+Net Protocol / Botchan (5 native posts + replies + engagement):
   09:00 ET  Botchan Ecosystem / Capability Post
   11:00 ET  Botchan Market Analysis / Signal Breakdown
   15:00 ET  Botchan Net Reflection / Tool Spotlight
   19:00 ET  Botchan Builder Log / Capability / GitHub
   21:00 ET  Botchan Market Wrap / Builder Log
   */30min   Botchan Reply Monitor
+  */3h      Botchan Proactive Engagement (general feed)
   11:55 PM ET  Daily Summary (on-chain digest)
+
+Startup (one-time, fire-and-forget):
+  Botchan Profile Setup (profile, leaderboard, named feed)
+  Skills Initialization
 
 Mention Monitoring:
   */15min   Founder VIP Mention Check (every 15 minutes)
@@ -1332,8 +1478,8 @@ Learning Engine:
 Growth & Skills:
   03:00 ET  Smart Follow Cycle
   01:30 ET  Skill Sync to Net Protocol
-  10:00 ET  Skill Scout Session #1
-  22:00 ET  Skill Scout Session #2
+  10:00 ET  Skill Scout Session #1 (X + Botchan feeds)
+  22:00 ET  Skill Scout Session #2 (X + Botchan feeds)
 
 Knowledge System:
   */2h      Founder Tweet Monitor (every 2 hours, at :05 offset)

@@ -29,3 +29,9 @@ npm-debug.log*
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Dev-only tools (not production code)
+tools/
+
+# Planning / internal docs (not production)
+QasidAI_Overhaul_Plan.md

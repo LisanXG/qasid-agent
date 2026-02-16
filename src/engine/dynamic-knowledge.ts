@@ -40,8 +40,30 @@ export async function loadDynamicKnowledge(): Promise<string> {
     }
 }
 
+/** Meta-reasoning patterns that indicate observations, not actionable facts */
+const KNOWLEDGE_BLOCKLIST: RegExp[] = [
+    /^this is a casual/i,
+    /^the founder is signaling/i,
+    /^I can see the founder/i,
+    /^I notice(d)?\s/i,
+    /^it seems like/i,
+    /^it appears that/i,
+    /^this looks like/i,
+    /^the tweet (is|was|seems)/i,
+    /^qasidai (is|was) registered/i,
+    /^based on (this|the|my)/i,
+    /^from (this|the) (tweet|post|thread)/i,
+];
+
+/** Max active facts — prevents prompt bloat */
+const MAX_ACTIVE_FACTS = 30;
+
+/** Minimum fact length to prevent trivial entries */
+const MIN_FACT_LENGTH = 20;
+
 /**
  * Add a new fact to the dynamic knowledge store.
+ * Applies quality filters: blocklist, length check, dedup, and cap.
  */
 export async function addKnowledge(
     fact: string,
@@ -50,7 +72,21 @@ export async function addKnowledge(
     expiresAt?: Date,
 ): Promise<boolean> {
     try {
-        // Dedup: check if an identical fact already exists
+        // Quality gate 1: minimum length
+        if (fact.trim().length < MIN_FACT_LENGTH) {
+            log.debug('Fact too short, skipping', { length: fact.length, fact });
+            return false;
+        }
+
+        // Quality gate 2: blocklist — reject meta-reasoning, not actionable facts
+        for (const pattern of KNOWLEDGE_BLOCKLIST) {
+            if (pattern.test(fact.trim())) {
+                log.debug('Fact matches blocklist pattern, skipping', { fact: fact.slice(0, 80) });
+                return false;
+            }
+        }
+
+        // Quality gate 3: dedup — check if an identical fact already exists
         const { data: existing } = await supabase
             .from('qasid_knowledge')
             .select('id')
@@ -61,6 +97,31 @@ export async function addKnowledge(
         if (existing && existing.length > 0) {
             log.debug('Fact already exists, skipping', { fact: fact.slice(0, 80) });
             return false;
+        }
+
+        // Quality gate 4: cap active facts — prune oldest if at limit
+        const { data: activeCount } = await supabase
+            .from('qasid_knowledge')
+            .select('id')
+            .eq('active', true);
+
+        if (activeCount && activeCount.length >= MAX_ACTIVE_FACTS) {
+            // Deactivate the oldest facts to make room
+            const excess = activeCount.length - MAX_ACTIVE_FACTS + 1;
+            const { data: oldest } = await supabase
+                .from('qasid_knowledge')
+                .select('id')
+                .eq('active', true)
+                .order('created_at', { ascending: true })
+                .limit(excess);
+
+            if (oldest && oldest.length > 0) {
+                await supabase
+                    .from('qasid_knowledge')
+                    .update({ active: false })
+                    .in('id', oldest.map(o => o.id));
+                log.info(`🗑️ Pruned ${oldest.length} oldest fact(s) to stay under cap of ${MAX_ACTIVE_FACTS}`);
+            }
         }
 
         const { error } = await supabase

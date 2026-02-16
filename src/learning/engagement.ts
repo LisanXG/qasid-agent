@@ -72,31 +72,51 @@ async function getPostsNeedingMetrics(): Promise<PostWithExternalId[]> {
  * Returns the number of posts updated.
  */
 export async function fetchAndUpdateEngagement(): Promise<number> {
-    log.info('Starting engagement pipeline...');
+    log.info('═══ ENGAGEMENT PIPELINE START ═══');
 
+    // Stage 1: Find posts needing metrics
     const posts = await getPostsNeedingMetrics();
 
     if (posts.length === 0) {
-        log.info('No posts need metric updates');
+        log.info('No posts need metric updates — all posts either have metrics or no external_id');
         return 0;
     }
 
-    log.info(`Found ${posts.length} posts needing metric updates`);
+    // Diagnostic: how many have metrics vs not
+    const withMetrics = posts.filter(p => p.reactions !== null).length;
+    const withoutMetrics = posts.length - withMetrics;
+    log.info(`Stage 1: Found ${posts.length} posts needing updates`, {
+        needFirstFetch: withoutMetrics,
+        needRefresh: withMetrics,
+        sampleTweetIds: posts.slice(0, 3).map(p => p.external_id),
+    });
 
-    // Collect tweet IDs and build lookup map
+    // Stage 2: Fetch metrics from X API
     const tweetIds = posts.map(p => p.external_id);
     const postByTweetId = new Map(posts.map(p => [p.external_id, p]));
 
-    // Fetch metrics from X API (batched, 100 per call)
     const metricsMap = await getTweetMetrics(tweetIds);
 
+    // Stage 3: Diagnose API response
     if (metricsMap.size === 0) {
-        log.warn('No metrics returned from X API — API may be rate limited');
+        log.warn('⚠️ API_TIER_LIMITATION: X API returned 0 metrics', {
+            tweetIdsSent: tweetIds.length,
+            diagnosis: 'X Free tier does not support GET /2/tweets with public_metrics. ' +
+                'Upgrade to Basic tier ($100/mo) to enable the learning loop, or ' +
+                'engagement data will remain at zero and weights will never adapt.',
+            sampleIds: tweetIds.slice(0, 5),
+        });
         return 0;
     }
 
-    // Update each post in Supabase
+    log.info(`Stage 2: X API returned metrics for ${metricsMap.size}/${tweetIds.length} tweets`);
+
+    // Stage 4: Update Supabase
     let updated = 0;
+    let totalLikes = 0;
+    let totalReplies = 0;
+    let totalImpressions = 0;
+
     for (const [tweetId, metrics] of metricsMap) {
         const post = postByTweetId.get(tweetId);
         if (!post) continue;
@@ -106,19 +126,12 @@ export async function fetchAndUpdateEngagement(): Promise<number> {
                 postId: post.id,
                 reactions: metrics.like_count,
                 replies: metrics.reply_count,
-                // Use impressions as link_clicks proxy (best available metric)
                 linkClicks: metrics.impression_count,
             });
             updated++;
-
-            log.debug('Updated metrics for post', {
-                postId: post.id,
-                tweetId,
-                likes: metrics.like_count,
-                replies: metrics.reply_count,
-                retweets: metrics.retweet_count,
-                impressions: metrics.impression_count,
-            });
+            totalLikes += metrics.like_count;
+            totalReplies += metrics.reply_count;
+            totalImpressions += metrics.impression_count;
         } catch (error) {
             log.error('Failed to update metrics for post', {
                 postId: post.id,
@@ -128,10 +141,16 @@ export async function fetchAndUpdateEngagement(): Promise<number> {
         }
     }
 
-    log.info(`Engagement pipeline complete: ${updated}/${posts.length} posts updated`, {
-        fetched: metricsMap.size,
-        updated,
-        total: posts.length,
+    log.info(`═══ ENGAGEMENT PIPELINE COMPLETE ═══`, {
+        postsUpdated: `${updated}/${posts.length}`,
+        metricsFromApi: metricsMap.size,
+        aggregates: {
+            totalLikes,
+            totalReplies,
+            totalImpressions,
+            avgLikes: updated > 0 ? (totalLikes / updated).toFixed(1) : '0',
+            avgImpressions: updated > 0 ? (totalImpressions / updated).toFixed(0) : '0',
+        },
     });
 
     return updated;

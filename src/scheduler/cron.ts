@@ -1,9 +1,10 @@
 import cron from 'node-cron';
 import { runFounderMentionCheck } from '../engine/mention-monitor.js';
-import { generatePost } from '../engine/content.js';
+import { generatePost, generateThread, sanitizeContent } from '../engine/content.js';
 import { savePost, wasRecentlyPosted } from '../engine/memory.js';
 import { runBotchanReplyMonitor } from '../net/botchan-replies.js';
-import { postTweet, postTweetWithImage } from '../platforms/x.js';
+import { runBotchanEngagement } from '../net/botchan-engage.js';
+import { postTweet, postTweetWithImage, postThread } from '../platforms/x.js';
 import { isXConfigured, isNetConfigured } from '../config.js';
 import { createLogger } from '../logger.js';
 import { buildAndWriteDailySummary } from '../net/daily-summary.js';
@@ -21,6 +22,9 @@ import { generateScorecardImage } from '../engine/scorecard-image.js';
 import { runBotchanContentCycle } from '../net/botchan-content.js';
 import { initializeSkills, syncSkillsToChain } from '../skills/skill-manager.js';
 import { runSkillScout } from '../skills/skill-scout.js';
+import { runBotchanSetup } from '../net/botchan-setup.js';
+import { crossPostThreadToBotchan, crossPostBotchanToX } from '../net/cross-platform.js';
+import { generateArticle } from '../engine/x-articles.js';
 import { runFounderMonitor } from '../engine/founder-monitor.js';
 import { runWebsiteMonitor } from '../engine/website-monitor.js';
 import { runGitHubMonitor } from '../engine/github-monitor.js';
@@ -53,7 +57,9 @@ async function runContentCycle(options?: {
     // Pre-check budget before generating/posting (enforce budget as a gate)
     const allowed = await canTakeAction('scheduled_post');
     if (!allowed) {
-        log.warn('Budget exhausted — skipping content cycle');
+        log.warn('Budget exhausted — skipping content cycle', {
+            preferredType: options?.preferredContentType ?? 'random',
+        });
         return;
     }
 
@@ -73,14 +79,27 @@ async function runContentCycle(options?: {
         // Dedup check — skip if very similar content type posted recently
         const duplicate = await wasRecentlyPosted(post.contentType, 'x', 4);
         if (duplicate) {
-            log.info(`Skipping ${post.contentType} — recently posted. Retrying with different type.`);
+            log.info(`Dedup: ${post.contentType} recently posted — retrying with different type`);
             const retry = await generatePost({ strategyContext: context, weights: { [post.contentType]: 0 } });
             const retryDup = await wasRecentlyPosted(retry.contentType, 'x', 4);
             if (retryDup) {
-                log.warn('Still duplicate after retry, skipping this cycle');
+                log.info(`Dedup: ${retry.contentType} also recent — trying fully random`);
+                const fallback = await generatePost({
+                    strategyContext: context,
+                    weights: { [post.contentType]: 0, [retry.contentType]: 0 },
+                });
+                // Third try — post regardless (don't silently drop)
+                const budgetOk = await recordAction('scheduled_post', `${fallback.contentType}: ${fallback.content.slice(0, 60)}`);
+                if (!budgetOk) {
+                    log.warn('Budget reservation failed on dedup fallback — skipping post');
+                    return;
+                }
+                const externalId = await postTweet(fallback.content);
+                await savePost(fallback, externalId ?? undefined);
+                log.info(`✅ Content cycle (dedup fallback): ${fallback.contentType} → X`);
                 return;
             }
-            // Reserve budget BEFORE posting (safer: wastes a slot if post fails, but prevents over-posting)
+            // Reserve budget BEFORE posting
             const budgetOk = await recordAction('scheduled_post', `${retry.contentType}: ${retry.content.slice(0, 60)}`);
             if (!budgetOk) {
                 log.warn('Budget reservation failed — skipping post');
@@ -88,6 +107,7 @@ async function runContentCycle(options?: {
             }
             const externalId = await postTweet(retry.content);
             await savePost(retry, externalId ?? undefined);
+            log.info(`✅ Content cycle (dedup retry): ${retry.contentType} → X`);
             return;
         }
 
@@ -144,6 +164,11 @@ export function startScheduler(): void {
         log.warn('Skills initialization failed, continuing without skills', { error: String(error) });
     });
 
+    // Set up Botchan profile + agent leaderboard (fire-and-forget, non-blocking)
+    runBotchanSetup().catch(error => {
+        log.warn('Botchan setup failed, continuing without profile', { error: String(error) });
+    });
+
     // ---- 10 Content Cycles / Day ----
 
     // 06:00 ET — 🌅 GM post
@@ -152,6 +177,7 @@ export function startScheduler(): void {
         await runContentCycle({ preferredContentType: 'gm_post' });
     }, { timezone: 'America/New_York' });
     activeTasks.push(gm);
+    log.info('📌 Registered: 06:00 ET — GM post');
 
     // 08:00 ET — 📊 Market / signal data (WITH scorecard image)
     const marketData = cron.schedule('0 8 * * *', async () => {
@@ -251,6 +277,21 @@ export function startScheduler(): void {
     activeTasks.push(creative);
     log.info('🎨 Creative sessions active (9:30, 13:30, 17:30, 21:30 ET — reply budget)');
 
+    // ---- Timeline Scanner (proactive engagement — 3x/day) ----
+    // Searches for relevant crypto/AI tweets and replies contextually.
+    // Staggered from content posts and creative sessions.
+    const timelineScan = cron.schedule('45 7,12,19 * * *', async () => {
+        log.info('🔍 Timeline scan starting (proactive engagement)');
+        try {
+            const replies = await runTimelineScan();
+            log.info(`🔍 Timeline scan complete: ${replies} replies posted`);
+        } catch (error) {
+            log.error('Timeline scan failed', { error: String(error) });
+        }
+    }, { timezone: 'America/New_York' });
+    activeTasks.push(timelineScan);
+    log.info('🔍 Timeline scanner active (7:45, 12:45, 19:45 ET — proactive engagement)');
+
     // ---- Botchan Native Content (5 unique posts for Net Protocol) ----
 
     // 9:00 ET — Botchan ecosystem insight or agent capability
@@ -283,7 +324,14 @@ export function startScheduler(): void {
         try {
             const types = ['net_reflection', 'tool_spotlight', 'agent_capability'];
             const type = types[Math.floor(Math.random() * types.length)];
-            await runBotchanContentCycle(type as any);
+            const result = await runBotchanContentCycle(type as any);
+
+            // Tease deeper Botchan posts on X
+            if (result?.text) {
+                crossPostBotchanToX(result.text, result.topic).catch(e =>
+                    log.debug('Botchan-to-X teaser skipped', { error: String(e) })
+                );
+            }
         } catch (error) {
             log.error('Botchan afternoon post failed', { error: String(error) });
         }
@@ -296,7 +344,14 @@ export function startScheduler(): void {
         try {
             const types = ['builder_log', 'agent_capability', 'github_share', 'tool_spotlight'];
             const type = types[Math.floor(Math.random() * types.length)];
-            await runBotchanContentCycle(type as any);
+            const result = await runBotchanContentCycle(type as any);
+
+            // Tease deeper Botchan posts on X
+            if (result?.text) {
+                crossPostBotchanToX(result.text, result.topic).catch(e =>
+                    log.debug('Botchan-to-X teaser skipped', { error: String(e) })
+                );
+            }
         } catch (error) {
             log.error('Botchan evening post failed', { error: String(error) });
         }
@@ -315,6 +370,50 @@ export function startScheduler(): void {
     }, { timezone: 'America/New_York' });
     activeTasks.push(botchanNight);
     log.info('⛓️  Botchan native content active (9:00, 11:00, 15:00, 19:00, 21:00 ET)');
+
+    // ---- Scheduled Threads (2x/day: 10:30 AM, 4:30 PM ET) ----
+    const threadSlots = [
+        { cron: '30 10 * * *', label: 'morning thread' },
+        { cron: '30 16 * * *', label: 'afternoon thread' },
+    ];
+    for (const slot of threadSlots) {
+        const threadJob = cron.schedule(slot.cron, async () => {
+            const allowed = await canTakeAction('thread');
+            if (!allowed) {
+                log.debug(`Thread skipped (${slot.label}) — budget exhausted`);
+                return;
+            }
+            log.info(`🧵 Scheduled ${slot.label} starting...`);
+            try {
+                const strategyContext = await getStrategyContext();
+                const thread = await generateThread({ strategyContext });
+                if (thread && thread.tweets.length >= 2) {
+                    await recordAction('thread', `Thread: ${thread.tweets[0].slice(0, 50)}`);
+                    const tweetIds = await postThread(thread.tweets);
+                    await savePost({
+                        content: thread.tweets.join('\n---\n'),
+                        contentType: thread.contentType,
+                        platform: 'x',
+                        tone: 'informative',
+                        topic: thread.topic,
+                        inputTokens: thread.inputTokens,
+                        outputTokens: thread.outputTokens,
+                        generatedAt: new Date().toISOString(),
+                    }, tweetIds[0] ?? undefined);
+                    log.info(`🧵 ${slot.label} posted (${thread.tweets.length} tweets)`);
+
+                    // Cross-post thread summary to Botchan
+                    crossPostThreadToBotchan(thread.tweets, tweetIds).catch(e =>
+                        log.debug('Thread cross-post to Botchan skipped', { error: String(e) })
+                    );
+                }
+            } catch (error) {
+                log.error(`Scheduled ${slot.label} failed`, { error: String(error) });
+            }
+        }, { timezone: 'America/New_York' });
+        activeTasks.push(threadJob);
+    }
+    log.info('🧵 Scheduled threads active (10:30 AM, 4:30 PM ET)');
 
     // Daily at 0:30 AM ET — Fetch engagement metrics from X API
     const engagementFetch = cron.schedule('30 0 * * *', async () => {
@@ -429,8 +528,8 @@ export function startScheduler(): void {
     activeTasks.push(mentionMonitor);
     log.info('💬 General mention monitor active (every 30 min)');
 
-    // ---- Skill Scout (2x/day: 10:00 and 22:00 UTC) ----
-    const skillScoutAM = cron.schedule('0 10 * * *', async () => {
+    // ---- Skill Scout (2x/day: 10:15 and 22:15 UTC — staggered to avoid cron collision) ----
+    const skillScoutAM = cron.schedule('15 10 * * *', async () => {
         log.info('🔍 Skill scout (AM) starting...');
         try {
             const proposed = await runSkillScout();
@@ -441,7 +540,7 @@ export function startScheduler(): void {
     }, { timezone: 'America/New_York' });
     activeTasks.push(skillScoutAM);
 
-    const skillScoutPM = cron.schedule('0 22 * * *', async () => {
+    const skillScoutPM = cron.schedule('15 22 * * *', async () => {
         log.info('🔍 Skill scout (PM) starting...');
         try {
             const proposed = await runSkillScout();
@@ -451,7 +550,7 @@ export function startScheduler(): void {
         }
     }, { timezone: 'America/New_York' });
     activeTasks.push(skillScoutPM);
-    log.info('🔍 Skill scout active (2x/day: 10:00 & 22:00 ET)');
+    log.info('🔍 Skill scout active (2x/day: 10:15 & 22:15 ET — staggered from content posts)');
 
     // ---- Founder Tweet Monitor (every 2 hours) ----
     const founderMonitor = cron.schedule('5 */2 * * *', async () => {
@@ -530,6 +629,38 @@ export function startScheduler(): void {
         }, { timezone: 'America/New_York' });
         activeTasks.push(botchanReplies);
         log.info('📨 Botchan reply monitor active (every 30 min)');
+
+        // ---- Proactive Botchan Engagement (every 3 hours) ----
+        const botchanEngage = cron.schedule('0 */3 * * *', async () => {
+            log.debug('🤝 Botchan engagement cycle running...');
+            try {
+                const engaged = await runBotchanEngagement();
+                if (engaged > 0) {
+                    log.info(`🤝 Botchan engagement: ${engaged} interaction(s)`);
+                }
+            } catch (error) {
+                log.error('Botchan engagement failed', { error: String(error) });
+            }
+        }, { timezone: 'America/New_York' });
+        activeTasks.push(botchanEngage);
+        log.info('🤝 Botchan proactive engagement active (every 3 hours)');
+
+        // ---- Weekly X Article Generation (Wednesday 5:00 AM ET) ----
+        const articleJob = cron.schedule('0 5 * * 3', async () => {
+            log.info('📝 Generating weekly X Article...');
+            try {
+                const article = await generateArticle();
+                if (article) {
+                    log.info(`📝 Article ready: "${article.title}" (${article.wordCount} words) — check Supabase to publish`);
+                } else {
+                    log.warn('Article generation returned null');
+                }
+            } catch (error) {
+                log.error('Weekly article generation failed', { error: String(error) });
+            }
+        }, { timezone: 'America/New_York' });
+        activeTasks.push(articleJob);
+        log.info('📝 Weekly X Article generation active (Wednesday 5:00 AM ET)');
     }
 
     log.info(`Scheduler started with ${activeTasks.length} cron jobs (10 X posts + 5 Botchan posts + 20 reply budget + monitors)`);
