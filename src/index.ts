@@ -38,17 +38,13 @@ async function main() {
     const postingStatus = config.POSTING_ENABLED ? '[LIVE]' : '[DRY RUN]';
     const anthropicStatus = config.ANTHROPIC_API_KEY ? '[OK] Ready' : '[MISSING] Missing';
 
-    console.log(`
-  +========================================+
-  |       QasidAI Capability Check         |
-  +========================================+
-  | X Posting:      ${xStatus.padEnd(22)}|
-  | Image Gen:      ${replicateStatus.padEnd(22)}|
-  | Net Protocol:   ${netStatus.padEnd(22)}|
-  | Anthropic LLM:  ${anthropicStatus.padEnd(22)}|
-  | Posting Mode:   ${postingStatus.padEnd(22)}|
-  +========================================+
-  `);
+    log.info('=== QasidAI Capability Check ===');
+    log.info(`  X Posting:      ${xStatus}`);
+    log.info(`  Image Gen:      ${replicateStatus}`);
+    log.info(`  Net Protocol:   ${netStatus}`);
+    log.info(`  Anthropic LLM:  ${anthropicStatus}`);
+    log.info(`  Posting Mode:   ${postingStatus}`);
+    log.info('================================');
 
     // Check for CLI arguments
     const args = process.argv.slice(2);
