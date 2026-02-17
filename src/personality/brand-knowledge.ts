@@ -201,7 +201,7 @@ export const brandKnowledge = {
                 posting: '10 scheduled X posts spread across waking hours (6 AM–11:30 PM ET), plus a 20-action discretionary budget for replies and engagement. 5 native Botchan posts and 10 Botchan replies round out 45 total daily actions.',
                 mentionHandling: 'Monitors mentions continuously. General mentions get classified and responded to. Founder mentions get VIP treatment — deeper analysis, more context, CMO-peer tone instead of casual.',
                 timeAwareness: 'The agent knows what time of day it is (ET) and adjusts its energy — GM posts in the morning, reflective builder logs in the evening, unhinged cult-posting energy late at night.',
-                creativeSessions: '4 creative sessions per day (9:30, 1:30, 5:30, 9:30 ET) where the LLM decides its own actions — reply to trending tweets, post bonus content, create threads, or generate signal scorecard images.',
+                creativeSessions: '2 creative sessions per day (1:30 PM, 9:30 PM ET) where the LLM decides its own actions — reply to trending tweets, post bonus content, create threads, generate AI images, or quote tweet interesting posts.',
             },
             // What makes QasidAI philosophically different
             identity: {

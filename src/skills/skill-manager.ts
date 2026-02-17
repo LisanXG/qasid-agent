@@ -72,12 +72,12 @@ export type SkillSource =
 
 const BUILT_IN_SKILLS: Skill[] = [
     {
-        id: 'signal-scorecard',
-        name: 'Signal Scorecard Image',
-        description: 'Generate a branded signal scorecard image with live data from LISAN Intelligence',
+        id: 'ai-image-generation',
+        name: 'AI Image Generation',
+        description: 'Generate eye-catching AI images using Replicate Flux to attach to tweets and replies',
         category: 'content',
         source: 'built_in',
-        prompt: 'Generate a signal scorecard tweet with the latest data from LISAN Intelligence.',
+        prompt: 'Generate an AI image that complements a tweet about the given topic. Use vivid, scroll-stopping visuals.',
         learnedAt: BUILT_IN_EPOCH,
         usageCount: 0,
         confidence: 1.0,
@@ -279,7 +279,7 @@ OBSERVED CONTENT:
 "${content.slice(0, 500)}"
 
 YOUR EXISTING SKILLS:
-- Signal Scorecard Image (generate branded scorecard images)
+- AI Image Generation (generate eye-catching AI images via Replicate Flux)
 - Multi-Tweet Thread (write 3-5 tweet threads)
 - Trending Reply (sharp replies to trending tweets)
 - Market Regime Commentary (interpret market regime data)

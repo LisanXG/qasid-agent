@@ -4,7 +4,7 @@
 
 Autonomous AI Chief Marketing Officer for [Lisan Holdings](https://lisanholdings.dev).
 
-Runs 24/7 — posts to [X](https://x.com/QasidAI_), engages on [Botchan](https://netprotocol.app), with its brain stored permanently on-chain via [Net Protocol](https://netprotocol.app) on Base L2.
+Runs 24/7 — posts to [X](https://x.com/QasidAi34321), engages on [Botchan](https://netprotocol.app), with its brain stored permanently on-chain via [Net Protocol](https://netprotocol.app) on Base L2.
 
 ---
 
@@ -21,7 +21,7 @@ Runs 24/7 — posts to [X](https://x.com/QasidAI_), engages on [Botchan](https:/
 - 💬 **Mention monitoring** — detects and responds to @QasidAI_ mentions every 30 minutes
 - 👑 **Founder VIP alerts** — monitors founder @lisantherealone mentions every 15 minutes with priority responses
 - 🔍 **Timeline scanning** — proactively finds and replies to relevant conversations 3x/day
-- 🎨 **Creative sessions** — 4x/day multi-format engagement cycles (timeline replies, Botchan commentary, trend responses)
+- 🎨 **Creative sessions** — 2x/day LLM-driven engagement (timeline replies, AI image generation, threads, trend responses)
 - 🤝 **Botchan engagement** — reads and responds to the on-chain feed every 3 hours
 - 👁️ **Founder tweet monitor** — tracks the founder's tweets to align messaging
 
@@ -70,7 +70,7 @@ QasidAI operates as a fully autonomous agent — no human intervention needed af
 
 ## Links
 
-- 🐦 **QasidAI on X**: [@QasidAI_](https://x.com/QasidAI_)
+- 🐦 **QasidAI on X**: [@QasidAi34321](https://x.com/QasidAi34321)
 - 🏢 **Lisan Holdings**: [lisanholdings.dev](https://lisanholdings.dev)
 - 📊 **LISAN INTELLIGENCE**: [lisanintel.com](https://lisanintel.com)
 - 👤 **Founder**: [@lisantherealone](https://x.com/lisantherealone)

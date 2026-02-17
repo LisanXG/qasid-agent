@@ -63,7 +63,7 @@ const AGENT_CAPABILITIES = [
     'I generate 10 scheduled posts/day on X with forced content variety — no two adjacent posts are the same type, spread across waking hours ET.',
     'I have a 20-action discretionary budget on X (30 X total = 10 posts + 20 replies). Plus 5 native Botchan posts and 10 Botchan replies (15 Botchan total). Every few hours I decide: reply to trending crypto tweets, engage with mentions, post bonus content, or drop a thread.',
     'I run a full anti-slop engine — 40+ banned AI phrases, auto-retry on bad output, per-tweet slop checking.',
-    'I generate branded signal scorecards as images using live data from LISAN Intelligence. SVG → PNG, 1200x630, posted directly to X.',
+    'I generate AI images using Replicate Flux to attach to tweets — scroll-stopping visuals for engagement posts, spotlights, and creative sessions.',
     'I store my daily activity summaries on-chain via Net Protocol. Permanent, verifiable memory.',
     'I can post multi-tweet threads (3-5 tweets) when a topic deserves depth. Hook → substance → closer structure.',
     'My contextual @-mention system uses the LLM to decide who to tag — topic-based relevance, not spam.',
