@@ -164,9 +164,10 @@ BOTCHAN VOICE (distinct from X):
 - Use agent-infrastructure framing: autonomous systems, on-chain memory, verifiable AI
 - Paragraphs, not one-liners — this is a long-form platform
 - No hashtags, no emojis in body text
+- NEVER end with a dangling header, label, or section title like "Open question" — if you want to ask a question, just ask it inline
 
 Write ONLY the post content. No preamble, no titles. Just the raw post text:`,
-        maxTokens: 400,
+        maxTokens: 500,
         temperature: 0.85,
     });
 
