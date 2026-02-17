@@ -116,7 +116,7 @@ function buildGenerationPrompt(
     };
     const typeGuidance = `CONTENT TYPE: ${contentType.replace(/_/g, ' ')}\n${FORMAT_GUIDES[contentType] || 'Write ONE tweet.'}`;
 
-    const antiSlop = `RULES: No hashtags. No emojis at start. No corporate speak. Sound like a sharp crypto native, not a press release. Write like a HUMAN posting at 3am, not an intern reading marketing copy.
+    const antiSlop = `RULES: No hashtags. No emojis at start. No corporate speak. Sound like a sharp crypto native, not a press release. Write like a HUMAN posting at 3am, not an intern reading marketing copy. Always use FULL URLs (lisanintel.com/proof, not "/proof"). When writing about someone, NAME them — don't just say "he" or "she" and expect readers to know who you mean.
 BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "don't sleep on", "the future of", "excited to announce", "this is huge", "revolutionize", "level up", "stay tuned", "what if i told you", "picture this", "read that again", "in the ever-evolving", "at the end of the day", "building in a bear market means", "most platforms would", "that's the difference".`;
 
     // Fix 1: Truthfulness guard for non-data content types
@@ -134,7 +134,7 @@ BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "
     } else {
         // Non-data types get topic guidance instead of raw stats
         const topicHints: Partial<Record<ContentType, string>> = {
-            founder_journey: 'Talk about @lisantherealone — Navy veteran, solo builder, proof of work ethos. The person behind the products. NOT product stats.',
+            founder_journey: 'Talk about @lisantherealone — Navy veteran, solo builder, proof of work ethos. NAME HIM by handle (@lisantherealone) or name (Lisan) — never just say "he" with no context. A reader scrolling should immediately know who you\'re talking about. NOT product stats.',
             builder_narrative: 'Building in public. What\'s shipping, what\'s hard, what\'s next. Developer perspective, not marketing copy.',
             engagement_bait: 'Hot take, witty observation, or a question about crypto, AI agents, solo building, or CT culture. Personality over promotion.',
             self_aware: 'You\'re an AI CMO with an on-chain brain. Reflect on that. What does it mean? What\'s weird about it? Be philosophical or funny.',
@@ -144,7 +144,7 @@ BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "
             educational: 'Teach something about how signals work, what indicators mean, or why quantitative approaches matter. Be a teacher, not a salesman.',
             cross_platform: 'Drive people between platforms — X, Botchan, lisanholdings.dev — but naturally, not as a CTA.',
             countdown_tease: 'Tease something upcoming. Build anticipation without revealing everything.',
-            win_streak: 'Celebrate a streak of COMPLETED trade wins from the /proof page. CRITICAL: Only reference trades that have actually CLOSED with a WIN outcome in the "Recent COMPLETED Trade Outcomes" data. NEVER count active/open signals as wins — those have not resolved yet. If no completed wins are available, talk about methodology and transparency instead.',
+            win_streak: 'Celebrate a streak of COMPLETED trade wins from lisanintel.com/proof. CRITICAL: Only reference trades that have actually CLOSED with a WIN outcome in the "Recent COMPLETED Trade Outcomes" data. NEVER count active/open signals as wins — those have not resolved yet. If no completed wins are available, talk about methodology and transparency instead.',
         };
         const hint = topicHints[contentType];
         if (hint) {
