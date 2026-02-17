@@ -524,6 +524,49 @@ export async function runFounderMentionCheck(): Promise<number> {
             continue;
         }
 
+        // Check if this is an image generation request (natural language triggers)
+        const imageMatch = mention.text.match(
+            /@\w+\s+(?:visualize|draw|create\s+(?:an?\s+)?image|generate\s+(?:an?\s+)?image|show\s+me|paint|design|imagine)\s+(.+)/is,
+        );
+        if (imageMatch) {
+            const imagePrompt = sanitizeUserInput(imageMatch[1].trim(), 500);
+            log.info('🖼️ Founder image request detected', { prompt: imagePrompt.slice(0, 80) });
+
+            try {
+                const { generateContentImage, isImageGenConfigured } = await import('./image-gen.js');
+                if (!isImageGenConfigured()) {
+                    const ack = `Image gen isn't configured right now. I'll get to it when Replicate is wired up. 🫡`;
+                    const ackId = await replyToTweet(mention.id, ack);
+                    if (ackId) {
+                        await recordReply(mention.id, FOUNDER_HANDLE, ackId, ack, 'founder_vip');
+                        processedFounderMentionIds.add(mention.id);
+                        replied++;
+                    }
+                    continue;
+                }
+
+                const image = await generateContentImage(imagePrompt, 'engagement_bait');
+                if (image) {
+                    const caption = `Here's what I see. 🖼️`;
+                    const { replyToTweetWithImage } = await import('../platforms/x.js');
+                    const replyId = await replyToTweetWithImage(mention.id, caption, image.buffer, image.mimeType);
+                    if (replyId) {
+                        await recordReply(mention.id, FOUNDER_HANDLE, replyId, `[IMAGE] ${caption} | prompt: ${imagePrompt.slice(0, 60)}`, 'founder_vip');
+                        processedFounderMentionIds.add(mention.id);
+                        replied++;
+                        log.info('🖼️ Image reply posted to founder', { replyId, prompt: imagePrompt.slice(0, 60) });
+                    }
+                    continue;
+                } else {
+                    log.warn('Image generation failed for founder request');
+                    // Fall through to normal reply
+                }
+            } catch (imgError) {
+                log.error('Image command failed', { error: String(imgError) });
+                // Fall through to normal reply
+            }
+        }
+
         // Draft a contextual response (founder-specific analytical prompt)
         // Fetch parent tweet context if this is a thread tag
         let parentTweet: { text: string; authorUsername?: string } | null = null;

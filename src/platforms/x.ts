@@ -425,6 +425,36 @@ export async function replyToTweet(tweetId: string, text: string): Promise<strin
 }
 
 /**
+ * Reply to a tweet with an image attachment. Returns the reply tweet ID.
+ */
+export async function replyToTweetWithImage(
+    tweetId: string,
+    text: string,
+    imageBuffer: Buffer,
+    mimeType: string = 'image/png',
+): Promise<string | null> {
+    if (!config.POSTING_ENABLED) {
+        log.info('[DRY RUN] Would reply to tweet with image:', { tweetId, text, imageSize: imageBuffer.length });
+        return `dry-run-img-reply-${Date.now()}`;
+    }
+
+    try {
+        const mediaId = await getClient().v1.uploadMedia(imageBuffer, { mimeType });
+        log.info('Image uploaded for reply', { mediaId, size: imageBuffer.length });
+
+        const result = await getClient().v2.tweet(text, {
+            reply: { in_reply_to_tweet_id: tweetId },
+            media: { media_ids: [mediaId] },
+        });
+        log.info('Reply with image posted', { replyId: result.data.id, inReplyTo: tweetId });
+        return result.data.id;
+    } catch (error: any) {
+        log.error('Failed to reply with image', { error: String(error), tweetId });
+        return null;
+    }
+}
+
+/**
  * Follow a user by their user ID. Returns true on success.
  */
 export async function followUser(userId: string): Promise<boolean> {
