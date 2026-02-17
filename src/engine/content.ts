@@ -3,7 +3,7 @@ import { gatherIntelContext } from '../data/intelligence.js';
 import { gatherMarketContext } from '../data/market.js';
 import { createLogger } from '../logger.js';
 import { contentTypes, type ContentType } from '../personality/system-prompt.js';
-import { addContextualMentions } from './contextual-mentions.js';
+import { addContextualMentions, handleify, getFollowingContext } from './contextual-mentions.js';
 import { supabase } from '../supabase.js';
 import { brandKnowledge } from '../personality/brand-knowledge.js';
 
@@ -154,7 +154,11 @@ BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "
 
     const exclusionBlock = exclusions ? `\n\nAVOID REPEATING — here are recent posts (write something COMPLETELY DIFFERENT in topic and framing):\n${exclusions}` : '';
 
-    return `${brandInfo}\n\n${typeGuidance}\n\n${antiSlop}${truthfulness}${formatting}${dataBlock}${exclusionBlock}\n\nWrite the tweet now. Output ONLY the tweet text, nothing else.`;
+    // Network context: who QasidAI follows (rotated subset for natural mentions)
+    const networkContext = getFollowingContext();
+    const networkBlock = networkContext ? `\n\n${networkContext}` : '';
+
+    return `${brandInfo}\n\n${typeGuidance}\n\n${antiSlop}${truthfulness}${formatting}${dataBlock}${networkBlock}${exclusionBlock}\n\nWrite the tweet now. Output ONLY the tweet text, nothing else.`;
 }
 
 /**
@@ -353,6 +357,9 @@ Reply with ONLY a number (0-10):`,
 
     // Add contextual @-mentions if relevant
     content = await addContextualMentions(content);
+
+    // Replace known entity names with their @handles (deterministic, every post)
+    content = handleify(content);
 
     // Log length for monitoring (no hard limit — X Premium account)
     if (content.length > 500) {

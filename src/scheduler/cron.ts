@@ -17,6 +17,7 @@ import { postToFeed } from '../net/client.js';
 import { runTimelineScan } from '../engine/timeline-scanner.js';
 import { runMentionMonitor } from '../engine/mention-monitor.js';
 import { runSmartFollow } from '../engine/smart-follow.js';
+import { syncFollowingHandles } from '../engine/contextual-mentions.js';
 import { runCreativeSession } from '../engine/creative-session.js';
 import { recordAction, canTakeAction } from '../engine/daily-budget.js';
 import { generateScorecardImage } from '../engine/scorecard-image.js';
@@ -168,6 +169,11 @@ export function startScheduler(): void {
     // Set up Botchan profile + agent leaderboard (fire-and-forget, non-blocking)
     runBotchanSetup().catch(error => {
         log.warn('Botchan setup failed, continuing without profile', { error: String(error) });
+    });
+
+    // Initial sync of following list → handle map (fire-and-forget)
+    syncFollowingHandles().catch(error => {
+        log.warn('Initial handle sync failed, will retry at 3 AM', { error: String(error) });
     });
 
     // ---- 10 Content Cycles / Day ----
@@ -474,12 +480,16 @@ export function startScheduler(): void {
         try {
             const followed = await runSmartFollow();
             log.info(`👥 Smart follow complete: ${followed} users followed`);
+
+            // Sync following list → handle map for smart mentions
+            const cached = await syncFollowingHandles();
+            log.info(`🔗 Handle map synced: ${cached} verified accounts cached`);
         } catch (error) {
             log.error('Smart follow failed', { error: String(error) });
         }
     }, { timezone: 'America/New_York' });
     activeTasks.push(smartFollow);
-    log.info('👥 Smart follow cron active (3 AM ET)');
+    log.info('👥 Smart follow cron active (3 AM ET — includes handle map sync)');
 
     // End-of-day — 11:55 PM ET — Daily summary to Net Protocol (before the 23:30 reflection)
     if (isNetConfigured) {

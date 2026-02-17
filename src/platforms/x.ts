@@ -457,6 +457,44 @@ export async function followUser(userId: string): Promise<boolean> {
     }
 }
 
+export interface FollowedAccount {
+    userId: string;
+    handle: string;
+    displayName: string;
+    verified: boolean;
+}
+
+/**
+ * Fetch the list of accounts QasidAI follows.
+ * Returns display names + handles + verified status.
+ * Used once daily to sync the handle map for smart mentions.
+ */
+export async function getFollowing(maxResults: number = 200): Promise<FollowedAccount[]> {
+    try {
+        const myId = await getMyUserId();
+        const result = await getClient().v2.following(myId, {
+            max_results: Math.min(maxResults, 1000),
+            'user.fields': ['name', 'username', 'verified'],
+        });
+
+        const accounts: FollowedAccount[] = [];
+        for (const user of result.data ?? []) {
+            accounts.push({
+                userId: user.id,
+                handle: user.username,
+                displayName: user.name,
+                verified: (user as any).verified ?? false,
+            });
+        }
+
+        log.info(`Fetched following list: ${accounts.length} accounts`);
+        return accounts;
+    } catch (error) {
+        log.error('Failed to fetch following list', { error: String(error) });
+        return [];
+    }
+}
+
 /**
  * Fetch recent mentions of the authenticated user.
  * @param sinceId Only return mentions newer than this tweet ID

@@ -34,24 +34,10 @@ const RELEVANT_ACCOUNTS: RelevantAccount[] = [
         priority: 5,
     },
     {
-        handle: 'LisanIntel',
-        category: 'product',
-        context: 'When sharing signal data, scorecards, win rates, or market regime from LISAN Intelligence',
-        priority: 5,
-    },
-    {
         handle: 'netprotocolapp',
         category: 'partner',
         context: 'When discussing on-chain AI, decentralized agent infrastructure, or Net Protocol features',
         priority: 4,
-    },
-
-    // Ecosystem / crypto AI — lower priority, mention sparingly
-    {
-        handle: 'solaboratory',
-        category: 'ecosystem',
-        context: 'When talking about Solana ecosystem tools or agent launchpads',
-        priority: 2,
     },
 ];
 
@@ -203,4 +189,137 @@ export function addRelevantAccount(account: RelevantAccount): void {
     }
     RELEVANT_ACCOUNTS.push(account);
     log.info('Added relevant account for contextual mentions', { handle: account.handle });
+}
+
+/**
+ * Known entity names → their official @handles (static fallback).
+ * IMPORTANT: Only add VERIFIED real X accounts here.
+ */
+const STATIC_HANDLE_MAP: { pattern: RegExp; handle: string }[] = [
+    { pattern: /\bNet Protocol\b/i, handle: '@netprotocolapp' },
+    { pattern: /\bBotchan\b/i, handle: '@netprotocolapp' },
+];
+
+// ---- Dynamic Following Cache ----
+// Synced once daily from X API. Maps display names → @handles for accounts
+// QasidAI follows. Only verified accounts are included.
+
+interface CachedHandle {
+    handle: string;       // e.g. 'netprotocolapp'
+    displayName: string;  // e.g. 'Net Protocol'
+    pattern: RegExp;      // built from displayName for matching
+}
+
+let followingCache: CachedHandle[] = [];
+
+/**
+ * Sync the following cache from X API.
+ * Called once daily during the smart-follow cron.
+ * Only caches verified accounts to avoid tagging random/fake accounts.
+ */
+export async function syncFollowingHandles(): Promise<number> {
+    try {
+        const { getFollowing } = await import('../platforms/x.js');
+        const following = await (getFollowing as () => Promise<any[]>)();
+
+        // Only cache verified accounts (user's requirement)
+        const verified = following.filter((a: any) => a.verified);
+
+        followingCache = verified
+            .filter((a: any) => a.displayName && a.handle)
+            .map((a: any) => ({
+                handle: a.handle as string,
+                displayName: a.displayName as string,
+                // Build word-boundary regex from display name
+                // Escape regex special chars in display name
+                pattern: new RegExp(
+                    `\\b${(a.displayName as string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+                    'i'
+                ),
+            }));
+
+        log.info(`Following cache synced: ${followingCache.length} verified accounts`, {
+            total: following.length,
+            verified: verified.length,
+            cached: followingCache.length,
+            handles: followingCache.map(c => `@${c.handle}`).join(', '),
+        });
+
+        return followingCache.length;
+    } catch (error) {
+        log.error('Failed to sync following handles', { error: String(error) });
+        return 0;
+    }
+}
+
+/**
+ * Get a formatted context block of followed accounts for the LLM prompt.
+ * Returns a rotating subset of 5-8 accounts so QasidAI can naturally
+ * mention them in posts. Grows automatically as the following list grows.
+ */
+export function getFollowingContext(): string {
+    // Core accounts always included (founder + key partners)
+    const coreHandles = RELEVANT_ACCOUNTS.map(a => `@${a.handle} (${a.context})`);
+
+    // Dynamic accounts from the following cache — pick a random subset
+    const dynamicAccounts = followingCache
+        .filter(c => !RELEVANT_ACCOUNTS.some(r => r.handle.toLowerCase() === c.handle.toLowerCase()))
+        .map(c => ({ handle: c.handle, displayName: c.displayName }));
+
+    if (dynamicAccounts.length === 0 && coreHandles.length === 0) return '';
+
+    // Shuffle and pick 5-8 dynamic accounts (rotate each generation)
+    const maxDynamic = Math.min(8, dynamicAccounts.length);
+    const shuffled = dynamicAccounts.sort(() => Math.random() - 0.5).slice(0, maxDynamic);
+    const dynamicLines = shuffled.map(a => `@${a.handle} (${a.displayName})`);
+
+    const allAccounts = [...coreHandles, ...dynamicLines];
+
+    return [
+        'YOUR NETWORK: You follow these accounts on X. When your post topic is relevant to any of them, you may naturally @-mention up to 2-3 if they fit the context. Only tag if it genuinely adds value — never force it. Not every post needs a mention.',
+        ...allAccounts.map(a => `  - ${a}`),
+    ].join('\n');
+}
+
+/**
+ * Replace known entity names with their @handles in post content.
+ * Uses both static mappings (hardcoded core entities) and dynamic
+ * mappings (from the daily following list sync).
+ * Max 3 replacements per post to keep it natural without being spammy.
+ */
+export function handleify(content: string): string {
+    let result = content;
+    const MAX_MENTIONS = 3;
+    let mentionCount = 0;
+
+    // 1. Static mappings first (core entities like Net Protocol)
+    for (const { pattern, handle } of STATIC_HANDLE_MAP) {
+        if (mentionCount >= MAX_MENTIONS) break;
+        if (result.includes(handle)) continue;
+        const newResult = result.replace(pattern, handle);
+        if (newResult !== result) {
+            result = newResult;
+            mentionCount++;
+        }
+    }
+
+    // 2. Dynamic mappings from following cache
+    for (const { pattern, handle } of followingCache) {
+        if (mentionCount >= MAX_MENTIONS) break;
+        const atHandle = `@${handle}`;
+        if (result.includes(atHandle)) continue;
+        const newResult = result.replace(pattern, atHandle);
+        if (newResult !== result) {
+            result = newResult;
+            mentionCount++;
+        }
+    }
+
+    if (result !== content) {
+        log.info('Handleified entity name', {
+            original: content.slice(0, 100),
+            modified: result.slice(0, 100),
+        });
+    }
+    return result;
 }
