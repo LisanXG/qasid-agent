@@ -11,25 +11,26 @@ Runs 24/7 — posts to [X](https://x.com/QasidAi34321), engages on [Botchan](htt
 ## Capabilities
 
 ### Content & Distribution
-- 🧠 **10 daily X posts** — signal scorecards, builder narratives, market takes, product spotlights, performance recaps, and evening reflections, all powered by live data from [LISAN INTELLIGENCE](https://lisanintel.com)
-- 🧵 **Scheduled threads** — multi-tweet deep dives posted twice daily
-- 📝 **X Article generation** — weekly long-form articles stored for Premium publishing
-- 🎨 **AI image generation** — branded visuals via Replicate Flux, automatically attached to posts
+- 🧠 **10 daily X posts** — market analysis, builder narratives, product spotlights, performance recaps, and evening reflections, all powered by live data from [LISAN INTELLIGENCE](https://lisanintel.com)
+- 🧵 **Scheduled threads** — multi-tweet deep dives posted daily (10:30 AM ET)
+- 📝 **X Article generation** — weekly long-form articles generated Wednesdays for Premium publishing
+- 🎨 **AI image generation** — branded visuals via Replicate Flux, automatically attached to ~40% of eligible posts
 - ⛓️ **5 daily Botchan posts** — ecosystem insights, builder logs, tool spotlights, and agent capability shares on Net Protocol's on-chain feed
 
 ### Social Intelligence
-- 💬 **Mention monitoring** — detects and responds to @QasidAI_ mentions every 30 minutes
-- 👑 **Founder VIP alerts** — monitors founder @lisantherealone mentions every 15 minutes with priority responses
-- 🔍 **Timeline scanning** — proactively finds and replies to relevant conversations 3x/day
-- 🎨 **Creative sessions** — 2x/day LLM-driven engagement (timeline replies, AI image generation, threads, trend responses)
+- 💬 **Mention monitoring** — detects and responds to @QasidAi34321 mentions 2x/day (10 AM, 6 PM ET)
+- 👑 **Founder VIP alerts** — monitors founder @lisantherealone mentions 4x/day (8, 12, 4, 8 ET) with priority responses and image generation commands
+- 🔍 **Timeline scanning** — proactively finds and replies to relevant conversations 1x/day (12:45 PM ET)
+- 🎨 **Creative sessions** — 2x/day LLM-driven engagement (1:30 PM, 9:30 PM ET) — timeline replies, AI image generation, threads, trend responses
 - 🤝 **Botchan engagement** — reads and responds to the on-chain feed every 3 hours
-- 👁️ **Founder tweet monitor** — tracks the founder's tweets to align messaging
+- 👁️ **Founder tweet monitor** — tracks the founder's tweets every 2 hours to align messaging
 
 ### Learning & Adaptation
 - 📊 **Self-learning engine** — scores post performance, adapts content type weights daily
 - 📈 **Weekly meta-reviews** — compares week-over-week strategy and adjusts approach
 - 🔍 **Skill discovery** — scans Botchan for new capabilities and proposes skill adoption (2x/day)
 - 👥 **Smart follow** — identifies and follows engaged users (warm leads)
+- 🏷️ **Smart mentions** — dynamically tags accounts from QasidAI's following list when contextually relevant
 
 ### Cross-Platform Flywheel
 - 🔗 **Thread → Botchan** — automatically cross-posts thread summaries to the on-chain feed
