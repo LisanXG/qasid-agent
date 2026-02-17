@@ -1,7 +1,7 @@
 import { generate } from './llm.js';
 import { generatePost, generateThread, sanitizeContent } from './content.js';
 import { searchRecentTweets, replyToTweet, getMentions, postThread, postTweetWithImage, quoteTweet, type SearchResult, type MentionTweet } from '../platforms/x.js';
-import { generateScorecardImage } from './scorecard-image.js';
+
 import { generateScrollStopper, isImageGenConfigured } from './image-gen.js';
 import { gatherIntelContext } from '../data/intelligence.js';
 import { getDiscretionaryRemaining, recordAction, getBudgetSummary } from './daily-budget.js';
@@ -24,7 +24,6 @@ const AVAILABLE_ACTIONS = [
     'REPLY_MENTION — Respond to someone who @mentioned us',
     'BONUS_POST — Post extra original content (a thought, hot take, or observation)',
     'THREAD — Post a multi-tweet thread (3-5 tweets) diving deep into a topic',
-    'IMAGE_POST — Post a signal scorecard image with live data',
     'AI_IMAGE — Generate an AI image with a hot take (eye-catching scroll-stopper)',
     'QUOTE_TWEET — Quote tweet an interesting post with sharp commentary',
     'ASK_QUESTION — Post a thoughtful question to spark conversation and build relationships',
@@ -200,45 +199,20 @@ async function executeThread(): Promise<boolean> {
 }
 
 /**
- * Execute an IMAGE_POST action.
- */
-async function executeImagePost(): Promise<boolean> {
-    const scorecard = await generateScorecardImage();
-    if (!scorecard) {
-        log.warn('Scorecard image generation failed');
-        return false;
-    }
-
-    // Reserve budget BEFORE posting
-    const budgetOk = await recordAction('bonus_post', `Scorecard image: ${scorecard.caption.slice(0, 60)}`);
-    if (!budgetOk) {
-        log.warn('Budget reservation failed — skipping image post');
-        return false;
-    }
-
-    const externalId = await postTweetWithImage(scorecard.caption, scorecard.buffer);
-    if (externalId) {
-        log.info('✅ Scorecard image posted', { tweetId: externalId });
-        return true;
-    }
-    return false;
-}
-
-/**
  * Execute an AI_IMAGE action.
  * Generates an AI image with a scroll-stopping hot take.
- * Falls back to scorecard image if Replicate isn't configured.
+ * If Replicate isn't configured or fails, skips entirely.
  */
 async function executeAiImage(): Promise<boolean> {
     if (!isImageGenConfigured()) {
-        log.info('Image gen not configured, falling back to scorecard');
-        return executeImagePost();
+        log.info('Image gen not configured — skipping AI_IMAGE');
+        return false;
     }
 
     const scrollStopper = await generateScrollStopper();
     if (!scrollStopper) {
-        log.warn('Scroll stopper generation failed, falling back to scorecard');
-        return executeImagePost();
+        log.warn('Scroll stopper generation failed');
+        return false;
     }
 
     const budgetOk = await recordAction('bonus_post', `AI Image: ${scrollStopper.text.slice(0, 60)}`);
@@ -447,7 +421,7 @@ Just the action names, one per line. No explanation needed:`,
         else if (cleaned.startsWith('REPLY_MENTION')) actions.push('REPLY_MENTION');
         else if (cleaned.startsWith('BONUS_POST') || cleaned.startsWith('BONUS')) actions.push('BONUS_POST');
         else if (cleaned.startsWith('THREAD')) actions.push('THREAD');
-        else if (cleaned.startsWith('IMAGE_P')) actions.push('IMAGE_POST');
+        else if (cleaned.startsWith('IMAGE_P')) actions.push('AI_IMAGE');
         else if (cleaned.startsWith('AI_IMAGE') || cleaned === 'IMAGE') actions.push('AI_IMAGE');
         else if (cleaned.startsWith('QUOTE')) actions.push('QUOTE_TWEET');
         else if (cleaned.startsWith('ASK')) actions.push('ASK_QUESTION');
@@ -484,9 +458,7 @@ Just the action names, one per line. No explanation needed:`,
                 case 'THREAD':
                     success = await executeThread();
                     break;
-                case 'IMAGE_POST':
-                    success = await executeImagePost();
-                    break;
+
                 case 'QUOTE_TWEET':
                     success = await executeQuoteTweet(intelContext);
                     break;

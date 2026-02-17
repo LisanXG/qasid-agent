@@ -20,7 +20,6 @@ import { runSmartFollow } from '../engine/smart-follow.js';
 import { syncFollowingHandles } from '../engine/contextual-mentions.js';
 import { runCreativeSession } from '../engine/creative-session.js';
 import { recordAction, canTakeAction } from '../engine/daily-budget.js';
-import { generateScorecardImage } from '../engine/scorecard-image.js';
 import { runBotchanContentCycle } from '../net/botchan-content.js';
 import { initializeSkills, syncSkillsToChain } from '../skills/skill-manager.js';
 import { runSkillScout } from '../skills/skill-scout.js';
@@ -120,7 +119,30 @@ async function runContentCycle(options?: {
             return;
         }
 
-        // Post it to X
+        // Try AI image for visual content types (~40% of eligible types)
+        const IMAGE_ELIGIBLE_TYPES = ['engagement_bait', 'self_aware', 'product_spotlight', 'challenge', 'market_regime'];
+        const shouldTryImage = IMAGE_ELIGIBLE_TYPES.includes(post.contentType) && Math.random() < 0.4;
+
+        if (shouldTryImage) {
+            try {
+                const { generateContentImage, isImageGenConfigured } = await import('../engine/image-gen.js');
+                if (isImageGenConfigured()) {
+                    const image = await generateContentImage(post.content, post.contentType);
+                    if (image) {
+                        const externalId = await postTweetWithImage(post.content, image.buffer, image.mimeType);
+                        await savePost(post, externalId ?? undefined);
+                        log.info(`✅ Content cycle (with AI image): ${post.contentType} → X 🖼️`, {
+                            contentLength: post.content.length,
+                        });
+                        return;
+                    }
+                }
+            } catch (imgError) {
+                log.warn('AI image generation failed, posting text-only', { error: String(imgError) });
+            }
+        }
+
+        // Post text-only (default path or image fallback)
         const externalId = await postTweet(post.content);
 
         // Save to memory
@@ -186,29 +208,9 @@ export function startScheduler(): void {
     activeTasks.push(gm);
     log.info('📌 Registered: 06:00 ET — GM post');
 
-    // 08:00 ET — 📊 Market / signal data (WITH scorecard image)
+    // 08:00 ET — 📊 Market / signal data
     const marketData = cron.schedule('0 8 * * *', async () => {
-        log.info('📊 Market data cycle starting (with scorecard image)');
-        try {
-            // Try to generate and post a scorecard image
-            const scorecard = await generateScorecardImage();
-            if (scorecard) {
-                // Reserve budget BEFORE posting
-                const budgetOk = await recordAction('scheduled_post', `signal_scorecard (image): ${scorecard.caption.slice(0, 60)}`);
-                if (!budgetOk) {
-                    log.warn('Budget reservation failed — skipping scorecard image');
-                    return;
-                }
-                const externalId = await postTweetWithImage(scorecard.caption, scorecard.buffer);
-                if (externalId) {
-                    log.info('📊 Scorecard image posted', { tweetId: externalId });
-                    return;
-                }
-            }
-        } catch (error) {
-            log.warn('Scorecard image failed, falling back to text', { error: String(error) });
-        }
-        // Fallback to text-only
+        log.info('📊 Market data cycle starting');
         await runContentCycle({ preferredContentType: 'signal_scorecard' });
     }, { timezone: 'America/New_York' });
     activeTasks.push(marketData);
