@@ -30,11 +30,25 @@ async function main() {
     setLogLevel(config.LOG_LEVEL);
 
     log.info('Starting QasidAI...');
-    log.info('Platform status:', {
-        x: isXConfigured ? '✅ configured' : '❌ not configured',
-        net: isNetConfigured ? `⛓️ on-chain brain active (${getWalletAddress()})` : '❌ not configured',
-        postingEnabled: config.POSTING_ENABLED ? '🟢 LIVE' : '🔴 DRY RUN',
-    });
+
+    // Fix 9: Startup capability health check
+    const xStatus = isXConfigured ? '[OK] Configured' : '[MISSING] Missing keys';
+    const replicateStatus = config.REPLICATE_API_TOKEN ? '[OK] Configured' : '[MISSING] REPLICATE_API_TOKEN not set';
+    const netStatus = isNetConfigured ? `[OK] Active (${getWalletAddress()})` : '[MISSING] Not configured';
+    const postingStatus = config.POSTING_ENABLED ? '[LIVE]' : '[DRY RUN]';
+    const anthropicStatus = config.ANTHROPIC_API_KEY ? '[OK] Ready' : '[MISSING] Missing';
+
+    console.log(`
+  +========================================+
+  |       QasidAI Capability Check         |
+  +========================================+
+  | X Posting:      ${xStatus.padEnd(22)}|
+  | Image Gen:      ${replicateStatus.padEnd(22)}|
+  | Net Protocol:   ${netStatus.padEnd(22)}|
+  | Anthropic LLM:  ${anthropicStatus.padEnd(22)}|
+  | Posting Mode:   ${postingStatus.padEnd(22)}|
+  +========================================+
+  `);
 
     // Check for CLI arguments
     const args = process.argv.slice(2);

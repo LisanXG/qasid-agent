@@ -97,10 +97,35 @@ function buildGenerationPrompt(
     const b = brandKnowledge;
     const brandInfo = `You are QasidAI, autonomous CMO of ${b.company.name} — ${b.company.description} Products: ${b.products.intelligence.name} (quantitative crypto signal platform with ${b.products.intelligence.scoring.totalIndicators} indicators — lisanintel.com), ${b.products.score.name} (same engine as a PineScript indicator on TradingView), and YOU (QasidAI — AI CMO with an on-chain brain via Net Protocol on Base L2).`;
 
-    const typeGuidance = `CONTENT TYPE: ${contentType.replace(/_/g, ' ')} — write ONE tweet (max 270 chars).`;
+    // Per-type formatting guidance (Fix 2: formatting overhaul)
+    const FORMAT_GUIDES: Record<ContentType, string> = {
+        gm_post: 'Write ONE tweet. 1-2 short lines max. Morning energy. No essays.',
+        signal_scorecard: 'Data-first tweet. Use line breaks between data points. Lead with asset + direction.',
+        win_streak: 'Short proof tweet. Numbers first, then one line of commentary.',
+        market_regime: 'Market read. 2-3 short lines with line breaks between thoughts.',
+        challenge: 'Direct question or challenge to the audience. 1-2 sentences max.',
+        founder_journey: 'Story format. Use line breaks between paragraphs. 3-5 short lines.',
+        builder_narrative: 'Builder update. Use bullet-style lines.',
+        countdown_tease: 'Teaser tweet. Short + mysterious. 1-2 lines.',
+        product_spotlight: 'Pick ONE feature. 2-3 short paragraphs with line breaks.',
+        educational: 'Teacher voice. Short paragraphs. Use a line break after each key point.',
+        social_proof: 'Proof tweet. Lead with the number/stat, then context on the next line.',
+        engagement_bait: 'Short hot take or question. Max 2 sentences. Punchy.',
+        self_aware: '2-4 lines with line breaks. AI reflection but grounded, not preachy.',
+        cross_platform: 'Teaser pointing to Botchan or lisanintel.com. Short + link.',
+    };
+    const typeGuidance = `CONTENT TYPE: ${contentType.replace(/_/g, ' ')}\n${FORMAT_GUIDES[contentType] || 'Write ONE tweet.'}`;
 
     const antiSlop = `RULES: No hashtags. No emojis at start. No corporate speak. Sound like a sharp crypto native, not a press release. Write like a HUMAN posting at 3am, not an intern reading marketing copy.
 BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "don't sleep on", "the future of", "excited to announce", "this is huge", "revolutionize", "level up", "stay tuned", "what if i told you", "picture this", "read that again", "in the ever-evolving", "at the end of the day", "building in a bear market means", "most platforms would", "that's the difference".`;
+
+    // Fix 1: Truthfulness guard for non-data content types
+    const truthfulness = isDataType
+        ? ''
+        : '\nTRUTHFULNESS: You do NOT have live data in this prompt. NEVER fabricate specific numbers, win rates, trade counts, or signal data. Do NOT say "3 longs on SOL/ETH/BTC" or "87% win rate" unless you see LIVE DATA above. You may discuss methodology, philosophy, and the builder journey but never invent outcomes.\n';
+
+    // Fix 2: Formatting instruction for all posts
+    const formatting = '\nFORMATTING: Use line breaks between thoughts. Vary your post length. Some posts = 1 punchy sentence. Some = 3 short paragraphs with breaks. Write like a human who uses the Enter key. NEVER write one unbroken paragraph.\n';
 
     // Only inject data for data-relevant content types
     let dataBlock = '';
@@ -129,7 +154,7 @@ BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "
 
     const exclusionBlock = exclusions ? `\n\nAVOID REPEATING — here are recent posts (write something COMPLETELY DIFFERENT in topic and framing):\n${exclusions}` : '';
 
-    return `${brandInfo}\n\n${typeGuidance}\n\n${antiSlop}${dataBlock}${exclusionBlock}\n\nWrite the tweet now. Output ONLY the tweet text, nothing else.`;
+    return `${brandInfo}\n\n${typeGuidance}\n\n${antiSlop}${truthfulness}${formatting}${dataBlock}${exclusionBlock}\n\nWrite the tweet now. Output ONLY the tweet text, nothing else.`;
 }
 
 /**
@@ -209,7 +234,7 @@ export async function generatePost(
         prompt,
         strategyContext: options?.strategyContext,
         timeContext,
-        maxTokens: 150,
+        maxTokens: 300,
         temperature: 0.9,
     });
 
@@ -226,7 +251,7 @@ export async function generatePost(
             prompt: prompt + '\n\nIMPORTANT: Your previous output was too short. Write a full, complete tweet.',
             strategyContext: options?.strategyContext,
             timeContext,
-            maxTokens: 150,
+            maxTokens: 300,
             temperature: Math.min(1.0, 0.9 + lengthRetries * 0.05),
         });
         content = sanitizeContent(retry.content);
@@ -248,7 +273,7 @@ export async function generatePost(
             prompt: prompt + `\n\nIMPORTANT: Your previous output contained the banned phrase "${slopPhrase}". Do NOT use it. Write something completely different and more natural.`,
             strategyContext: options?.strategyContext,
             timeContext,
-            maxTokens: 150,
+            maxTokens: 300,
             temperature: Math.min(1.0, 0.9 + retries * 0.05), // Slightly higher temp each retry
         });
         content = sanitizeContent(retry.content);
@@ -258,6 +283,25 @@ export async function generatePost(
     }
     if (slopPhrase) {
         log.warn(`Slop persisted after ${retries} retries: "${slopPhrase}" — posting anyway`);
+    }
+
+    // Fix 1: Post-generation hallucination check for non-data types
+    if (!DATA_TYPES.includes(contentType)) {
+        const fabricationPattern = /\b\d+%|\b\d+\s+(longs?|shorts?|trades?|signals?|positions?)\b/i;
+        if (fabricationPattern.test(content)) {
+            log.warn('Hallucination detected in non-data post — stripping fabricated stats', { contentType });
+            content = content.replace(/\b\d+%/g, '').replace(/\b\d+\s+(longs?|shorts?|trades?|signals?|positions?)\b/gi, '').trim();
+            content = sanitizeContent(content);
+        }
+    }
+
+    // Fix 2: Wall-of-text detection — force line breaks
+    if (content.length > 200 && !content.includes('\n')) {
+        log.warn('Wall of text detected — injecting line break');
+        const breakMatch = content.match(/[.!?]\s+/);
+        if (breakMatch && breakMatch.index && breakMatch.index > 40 && breakMatch.index < content.length - 20) {
+            content = content.slice(0, breakMatch.index + 1) + '\n\n' + content.slice(breakMatch.index + breakMatch[0].length);
+        }
     }
 
     // Voice consistency check — score content for QasidAI's voice (1 retry if too generic)
@@ -291,7 +335,7 @@ Reply with ONLY a number (0-10):`,
                     prompt: prompt + `\n\nIMPORTANT: Your previous output scored ${voiceScore}/10 for voice consistency. It sounds too generic. Rewrite with MORE personality — caustic humor, military precision, crypto-native edge. Think "sharp mind at 3am" not "intern reading marketing copy."`,
                     strategyContext: options?.strategyContext,
                     timeContext,
-                    maxTokens: 150,
+                    maxTokens: 300,
                     temperature: 0.95,
                 });
                 const voiceContent = sanitizeContent(voiceRetry.content);
@@ -381,17 +425,17 @@ export async function generateThread(
     log.info(`Generating ${contentType} thread for X`);
 
     const result = await generate({
-        prompt: `Generate a ${contentType.replace(/_/g, ' ')} THREAD (3-5 tweets).
+        prompt: `Generate a ${contentType.replace(/_/g, ' ')} THREAD (3-4 tweets).
 
 For X/Twitter (Premium account — no 280 char limit). Each tweet should be punchy and concise — ideally under 400 chars. Don't pad tweets. No hashtags.
 
-RULES:
+THREAD FORMAT:
 - Separate each tweet with "---" on its own line
-- Tweet 1: Hook — grab attention, make people want to read more
-- Tweet 2-4: The substance — data, story, insight
-- Final tweet: The closer — a takeaway, CTA, or memorable line
-- Write like a real person on crypto twitter, not an AI
-- Use real data from Lisan Intelligence if relevant
+- Tweet 1: Start with 🧵 — the hook. Make the reader NEED to keep reading.
+- Tweet 2-3: Build on the previous tweet. Each adds NEW information. End with "→" or "..." to create visual continuity.
+- Final tweet: Punchline, takeaway, or CTA (lisanintel.com or @QasidAI34321).
+- Write ONE coherent narrative broken into parts. NOT 3 separate opinions.
+- NEVER start a tweet with "Exactly this" or "This." — you are not replying to yourself.
 - ANTI-SLOP: No banned phrases. No "dive in", "game changer", "buckle up", etc.
 ${dataBlock}
 

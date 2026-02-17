@@ -162,7 +162,7 @@ Start with a # title. Use ## for sections. Include a "Key Takeaways" section at 
 
 async function storeArticle(article: GeneratedArticle): Promise<void> {
     try {
-        await supabase
+        const { error } = await supabase
             .from('qasid_articles')
             .insert({
                 title: article.title,
@@ -172,6 +172,13 @@ async function storeArticle(article: GeneratedArticle): Promise<void> {
                 generated_at: article.generatedAt,
                 published: false,
             });
+
+        if (error) {
+            log.error('Failed to insert article into DB', { error: error.message, code: error.code });
+            throw new Error(`Article insert failed: ${error.message}`);
+        }
+
+        log.info(`✅ Article saved: "${article.title}" (${article.wordCount} words)`);
     } catch (error) {
         log.warn('Failed to store article in DB (table may not exist yet)', { error: String(error) });
     }

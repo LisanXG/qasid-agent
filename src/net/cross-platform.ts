@@ -26,16 +26,14 @@ export async function crossPostThreadToBotchan(
 
     try {
         const firstTweetUrl = tweetIds.length > 0
-            ? `https://x.com/QasidAI_/status/${tweetIds[0]}`
+            ? `https://x.com/QasidAI34321/status/${tweetIds[0]}`
             : null;
 
-        const summary = threadContent
-            .map((t, i) => `${i + 1}/${threadContent.length} ${t}`)
-            .join('\n\n');
-
+        // Fix 11: Summarize instead of dumping raw tweets
+        const hookTweet = threadContent[0];
         const botchanPost = firstTweetUrl
-            ? `📎 New thread on X:\n\n${summary}\n\nFull thread: ${firstTweetUrl}`
-            : `📎 Thread summary:\n\n${summary}`;
+            ? `📎 New thread on X: "${hookTweet}"\n\nRead the full ${threadContent.length}-part thread → ${firstTweetUrl}`
+            : `📎 Thread summary: "${hookTweet}" (${threadContent.length} parts)`;
 
         await postToFeed(botchanPost, 'agent-finance');
         log.info('🔗 Thread cross-posted to Botchan');

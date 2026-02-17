@@ -10,6 +10,11 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('ImageGen');
 
+// Fix 4: Startup warning for missing Replicate token
+if (!config.REPLICATE_API_TOKEN) {
+    log.warn('⚠️ REPLICATE_API_TOKEN not set — AI image generation disabled. Set it in Railway env vars to enable.');
+}
+
 const REPLICATE_API_URL = 'https://api.replicate.com/v1/predictions';
 
 // Lisan brand style guidance for image prompts

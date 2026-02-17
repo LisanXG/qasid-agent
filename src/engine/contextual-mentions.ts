@@ -9,6 +9,9 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('Mentions');
 
+// Fix 10: Per-post cooldown — track how many posts since last mention
+let postsSinceLastMention = 0;
+
 /**
  * Account categories — organized by topic/relevance.
  * QasidAI picks from these when the content is related.
@@ -54,7 +57,7 @@ const RELEVANT_ACCOUNTS: RelevantAccount[] = [
 
 /** Topic keywords → relevant account categories */
 const TOPIC_SIGNALS: Record<string, string[]> = {
-    founder: ['founder', 'built', 'building', 'journey', 'navy', 'veteran', 'lisan holdings', 'one-man army'],
+    founder: ['lisan holdings', 'my creator', 'my founder', 'the founder'],
     product: ['signal', 'scorecard', 'win rate', 'regime', 'lisan intelligence', 'lisanintel', 'proof', 'accuracy'],
     partner: ['net protocol', 'on-chain', 'onchain', 'botchan', 'agent infrastructure', 'decentralized ai'],
     ecosystem: ['solana', 'sol ecosystem', 'agent launchpad'],
@@ -111,9 +114,17 @@ export async function addContextualMentions(content: string): Promise<string> {
         return content;
     }
 
-    // Rate limit: only add mentions ~30% of the time to avoid spam
-    if (Math.random() > 0.30) {
+    // Rate limit: only add mentions ~15% of the time (Fix 10: reduced from 30%)
+    if (Math.random() > 0.15) {
         log.info('Skipping mentions this post (randomized throttle)');
+        postsSinceLastMention++;
+        return content;
+    }
+
+    // Fix 10: Cooldown — skip if fewer than 4 posts since last mention
+    if (postsSinceLastMention < 4) {
+        log.info(`Mention cooldown active (${postsSinceLastMention}/4 posts since last mention)`);
+        postsSinceLastMention++;
         return content;
     }
 
@@ -167,9 +178,12 @@ Return ONLY the final tweet text (with mentions if appropriate, or unchanged if 
         );
 
         if (mentionAdded) {
+            postsSinceLastMention = 0; // Fix 10: Reset cooldown
             log.info('Contextual mention added', {
                 handles: candidates.filter(a => tweaked.includes(`@${a.handle}`)).map(a => a.handle),
             });
+        } else {
+            postsSinceLastMention++;
         }
 
         return tweaked;

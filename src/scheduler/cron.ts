@@ -265,8 +265,8 @@ export function startScheduler(): void {
 
     // ---- Creative Sessions (LLM-driven discretionary/reply budget) ----
 
-    // 4 creative sessions per day — QasidAI decides what to do (reply, thread, quote, bonus)
-    const creative = cron.schedule('30 9,13,17,21 * * *', async () => {
+    // Fix 7: Reduced from 4 to 2 creative sessions per day for budget
+    const creative = cron.schedule('30 13,21 * * *', async () => {
         log.info('🎨 Creative session starting (QasidAI decides what to do)');
         try {
             const actions = await runCreativeSession();
@@ -276,12 +276,11 @@ export function startScheduler(): void {
         }
     }, { timezone: 'America/New_York' });
     activeTasks.push(creative);
-    log.info('🎨 Creative sessions active (9:30, 13:30, 17:30, 21:30 ET — reply budget)');
+    log.info('🎨 Creative sessions active (13:30, 21:30 ET — budget-optimized)');
 
-    // ---- Timeline Scanner (proactive engagement — 3x/day) ----
+    // ---- Timeline Scanner (proactive engagement — Fix 7: reduced 3x→1x/day) ----
     // Searches for relevant crypto/AI tweets and replies contextually.
-    // Staggered from content posts and creative sessions.
-    const timelineScan = cron.schedule('45 7,12,19 * * *', async () => {
+    const timelineScan = cron.schedule('45 12 * * *', async () => {
         log.info('🔍 Timeline scan starting (proactive engagement)');
         try {
             const replies = await runTimelineScan();
@@ -291,7 +290,7 @@ export function startScheduler(): void {
         }
     }, { timezone: 'America/New_York' });
     activeTasks.push(timelineScan);
-    log.info('🔍 Timeline scanner active (7:45, 12:45, 19:45 ET — proactive engagement)');
+    log.info('🔍 Timeline scanner active (12:45 ET — budget-optimized)');
 
     // ---- Botchan Native Content (5 unique posts for Net Protocol) ----
 
@@ -372,10 +371,9 @@ export function startScheduler(): void {
     activeTasks.push(botchanNight);
     log.info('⛓️  Botchan native content active (9:00, 11:00, 15:00, 19:00, 21:00 ET)');
 
-    // ---- Scheduled Threads (2x/day: 10:30 AM, 4:30 PM ET) ----
+    // ---- Scheduled Thread (Fix 5: reduced 2x→1x/day, morning only) ----
     const threadSlots = [
         { cron: '30 10 * * *', label: 'morning thread' },
-        { cron: '30 16 * * *', label: 'afternoon thread' },
     ];
     for (const slot of threadSlots) {
         const threadJob = cron.schedule(slot.cron, async () => {
@@ -414,7 +412,7 @@ export function startScheduler(): void {
         }, { timezone: 'America/New_York' });
         activeTasks.push(threadJob);
     }
-    log.info('🧵 Scheduled threads active (10:30 AM, 4:30 PM ET)');
+    log.info('🧵 Scheduled thread active (10:30 AM ET — budget-optimized)');
 
     // Daily at 0:30 AM ET — Fetch engagement metrics from X API
     const engagementFetch = cron.schedule('30 0 * * *', async () => {
@@ -499,8 +497,8 @@ export function startScheduler(): void {
 
 
 
-    // ---- Founder VIP Mention Monitor (every 15 min) ----
-    const founderMentions = cron.schedule('*/15 * * * *', async () => {
+    // ---- Founder VIP Mention Monitor (Fix 7: reduced every 15min → 4x/day) ----
+    const founderMentions = cron.schedule('0 8,12,16,20 * * *', async () => {
         log.debug('👑 Founder mention check running...');
         try {
             const replied = await runFounderMentionCheck();
@@ -512,10 +510,10 @@ export function startScheduler(): void {
         }
     }, { timezone: 'America/New_York' });
     activeTasks.push(founderMentions);
-    log.info('👑 Founder VIP mention monitor active (every 15 min)');
+    log.info('👑 Founder VIP mention monitor active (8, 12, 16, 20 ET — budget-optimized)');
 
-    // ---- General Mention Monitor (every 30 min) ----
-    const mentionMonitor = cron.schedule('*/30 * * * *', async () => {
+    // ---- General Mention Monitor (Fix 7: reduced every 30min → 2x/day) ----
+    const mentionMonitor = cron.schedule('0 10,18 * * *', async () => {
         log.debug('💬 General mention monitor running...');
         try {
             const replied = await runMentionMonitor();
@@ -527,7 +525,7 @@ export function startScheduler(): void {
         }
     }, { timezone: 'America/New_York' });
     activeTasks.push(mentionMonitor);
-    log.info('💬 General mention monitor active (every 30 min)');
+    log.info('💬 General mention monitor active (10 AM, 6 PM ET — budget-optimized)');
 
     // ---- Skill Scout (2x/day: 10:15 and 22:15 UTC — staggered to avoid cron collision) ----
     const skillScoutAM = cron.schedule('15 10 * * *', async () => {

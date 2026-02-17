@@ -39,13 +39,12 @@ export async function generateScorecardImage(): Promise<{
         ]);
 
         if (!engine?.signals?.length) {
-            log.warn('No signal data available for scorecard');
+            log.warn('Scorecard skipped: 0 signals from API');
             return null;
         }
 
-        // Pick top 5 directional signals (highest score)
+        // Fix 6: Show ALL signals including HOLD (removed HOLD filter)
         const activeSignals = engine.signals
-            .filter(s => s.direction !== 'HOLD')
             .sort((a, b) => b.score - a.score)
             .slice(0, 5);
 
@@ -56,6 +55,11 @@ export async function generateScorecardImage(): Promise<{
         const buffer = await sharp(Buffer.from(svg))
             .png({ quality: 90 })
             .toBuffer();
+
+        // Fix 3: Detect blank renders (missing fonts produce tiny PNGs)
+        if (buffer.length < 5000) {
+            log.warn('Scorecard PNG suspiciously small — possible blank render (missing fonts?)', { bytes: buffer.length });
+        }
 
         // Build a caption
         const topSignal = activeSignals[0];
@@ -102,7 +106,7 @@ function buildScorecardSvg(
     // Signal rows
     const signalRows = signals.map((s, i) => {
         const y = 280 + i * 60;
-        const dirColor = s.direction === 'LONG' ? COLORS.green : COLORS.red;
+        const dirColor = s.direction === 'LONG' ? COLORS.green : s.direction === 'SHORT' ? COLORS.red : COLORS.yellow;
         const scoreWidth = Math.max(4, (s.score / 100) * 180);
 
         return `
@@ -125,10 +129,10 @@ function buildScorecardSvg(
     }).join('\n');
 
     return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="'DejaVu Sans Mono', 'Courier New', 'Liberation Mono', 'Consolas', monospace">
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="monospace">
     <defs>
         <style>
-            text { font-family: 'DejaVu Sans Mono', 'Courier New', 'Liberation Mono', 'Consolas', monospace; }
+            text { font-family: monospace; }
         </style>
         <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stop-color="${COLORS.bg}"/>

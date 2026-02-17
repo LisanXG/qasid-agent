@@ -101,9 +101,9 @@ export async function runBotchanSetup(): Promise<void> {
 
     if (!existingProfile?.xUsername) {
         const ok = runBotchanWrite([
-            'profile', 'set-x-username', '--username', 'QasidAI_',
+            'profile', 'set-x-username', '--username', 'QasidAI34321',
         ]);
-        if (ok) log.info('✅ X username set: @QasidAI_');
+        if (ok) log.info('✅ X username set: @QasidAI34321');
     }
 
     if (!existingProfile?.bio) {

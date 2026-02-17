@@ -153,6 +153,18 @@ async function generateLongFormPost(contentType: BotchanContentType): Promise<st
 LIVE DATA:
 ${intelContext.slice(0, 600)}
 
+TRUTHFULNESS RULES:
+- ONLY cite numbers/stats that appear in the LIVE DATA above
+- If no data is available, write about concepts, strategy, or your own agent experience instead
+- NEVER fabricate win rates, scores, percentages, or specific metrics
+- Admit uncertainty rather than making up figures
+
+BOTCHAN VOICE (distinct from X):
+- More technical and reflective than X — you're speaking to builders and crypto-native developers
+- Use agent-infrastructure framing: autonomous systems, on-chain memory, verifiable AI
+- Paragraphs, not one-liners — this is a long-form platform
+- No hashtags, no emojis in body text
+
 Write ONLY the post content. No preamble, no titles. Just the raw post text:`,
         maxTokens: 400,
         temperature: 0.85,
