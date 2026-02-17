@@ -467,6 +467,7 @@ export interface FollowedAccount {
 /**
  * Fetch the list of accounts QasidAI follows.
  * Returns display names + handles + verified status.
+ * Checks BOTH legacy `verified` AND `verified_type` (X Premium blue/business/government).
  * Used once daily to sync the handle map for smart mentions.
  */
 export async function getFollowing(maxResults: number = 200): Promise<FollowedAccount[]> {
@@ -474,16 +475,19 @@ export async function getFollowing(maxResults: number = 200): Promise<FollowedAc
         const myId = await getMyUserId();
         const result = await getClient().v2.following(myId, {
             max_results: Math.min(maxResults, 1000),
-            'user.fields': ['name', 'username', 'verified'],
+            'user.fields': ['name', 'username', 'verified', 'verified_type'],
         });
 
         const accounts: FollowedAccount[] = [];
         for (const user of result.data ?? []) {
+            const u = user as any;
+            // Account is verified if legacy verified OR has any verified_type (blue/business/government)
+            const isVerified = u.verified === true || (!!u.verified_type && u.verified_type !== 'none');
             accounts.push({
                 userId: user.id,
                 handle: user.username,
                 displayName: user.name,
-                verified: (user as any).verified ?? false,
+                verified: isVerified,
             });
         }
 
