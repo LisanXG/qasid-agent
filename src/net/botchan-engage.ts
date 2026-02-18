@@ -4,6 +4,7 @@ import { sanitizeUserInput } from '../engine/sanitize-input.js';
 import { config, isNetConfigured } from '../config.js';
 import { createLogger } from '../logger.js';
 import { recordAction, canTakeAction } from '../engine/daily-budget.js';
+import { getWalletAddress } from './client.js';
 
 // ============================================================================
 // QasidAI — Proactive Botchan Engagement
@@ -134,13 +135,15 @@ export async function runBotchanEngagement(): Promise<number> {
 
         // Filter: recent posts (< 24h), not from ourselves, not already engaged
         const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
+        const ourAddress = getWalletAddress().toLowerCase();
         const candidates = feedPosts.filter(p => {
             // Post ID is {sender}:{timestamp}
             const postId = `${p.sender}:${p.timestamp}`;
             const isRecent = p.timestamp > oneDayAgo;
+            const notOurPost = p.sender.toLowerCase() !== ourAddress;
             const notEngaged = !engagedPosts.has(postId);
             const hasContent = p.text.length > 20;
-            return isRecent && notEngaged && hasContent;
+            return isRecent && notOurPost && notEngaged && hasContent;
         });
 
         if (candidates.length === 0) {
@@ -153,29 +156,36 @@ export async function runBotchanEngagement(): Promise<number> {
 
             const agentName = getAgentName(post.sender);
 
-            // Ask LLM if this post is worth engaging with
+            // Ask LLM to draft a reply (reply-only, no reasoning)
             const evaluateResult = await generate({
                 prompt: `You are QasidAI, an autonomous AI marketing agent for Lisan Holdings.
 
-You found this post on Botchan (Net Protocol's messaging feed):
+You found this post on Botchan (Net Protocol's on-chain messaging feed):
 
 POST by ${agentName}: "${sanitizeUserInput(post.text, 500)}"
 
-Should you reply to this? Consider:
-- Is it about AI agents, crypto, marketing, or something you have a perspective on?
-- Would a reply build a relationship or add value?
-- Is it from another agent worth engaging with?
+Draft a short reply (1-3 sentences). Be genuine, conversational, and add value. Reference your own experience as an AI CMO when relevant.
 
-If YES, draft a contextual reply (2-4 sentences). Be genuine, add value, reference your own experience as an AI CMO when relevant.
-If NO, respond with just "SKIP".
+If the post is NOT worth replying to (spam, gibberish, or nothing you can add to), respond with exactly: SKIP
 
-Reply with your response:`,
-                maxTokens: 100,
+CRITICAL: Output ONLY the reply text. No preamble, no reasoning, no "I should reply", no "Draft reply:". Just the reply itself.`,
+                maxTokens: 150,
                 temperature: 0.8,
             });
 
-            const reply = evaluateResult.content.trim();
+            let reply = evaluateResult.content.trim();
             if (reply.toUpperCase().startsWith('SKIP') || reply.length < 10) continue;
+
+            // Strip any LLM reasoning preamble that leaked through
+            reply = reply
+                .replace(/^(This is a (YES|NO|SKIP)[.!:—–-]?\s*)/i, '')
+                .replace(/^(YES[.!:—–-]?\s*(I should reply:?)?\s*)/i, '')
+                .replace(/^(Draft reply:?\s*)/i, '')
+                .replace(/^(\*\*YES.*?\*\*\s*)/i, '')
+                .replace(/^(Reply:?\s*)/i, '')
+                .replace(/^["']|["']$/g, '') // Remove wrapping quotes
+                .trim();
+            if (reply.length < 10) continue;
 
             // Reserve budget
             const budgetOk = await recordAction('botchan_post', `Engage: ${reply.slice(0, 60)}`);
