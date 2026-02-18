@@ -10,10 +10,9 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('ImageGen');
 
-// Fix 4: Startup warning for missing Replicate token
-if (!config.REPLICATE_API_TOKEN) {
-    log.warn('⚠️ REPLICATE_API_TOKEN not set — AI image generation disabled. Set it in Railway env vars to enable.');
-}
+// Fix 11: Deferred warning — only log on first use, not at import time.
+// Modules that import image-gen for type checking shouldn't trigger log noise.
+let _warnedMissingToken = false;
 
 const REPLICATE_API_URL = 'https://api.replicate.com/v1/predictions';
 
@@ -31,8 +30,13 @@ export interface GeneratedImage {
 
 /**
  * Check if image generation is configured.
+ * Logs a warning on first call if token is missing (Fix 11: deferred from module load).
  */
 export function isImageGenConfigured(): boolean {
+    if (!config.REPLICATE_API_TOKEN && !_warnedMissingToken) {
+        log.warn('⚠️ REPLICATE_API_TOKEN not set — AI image generation will use Pollinations.ai fallback only.');
+        _warnedMissingToken = true;
+    }
     return !!config.REPLICATE_API_TOKEN;
 }
 
@@ -103,7 +107,7 @@ export async function generateScrollStopper(): Promise<{ text: string; image: Ge
             prompt: `Generate a short, punchy crypto/AI hot take (under 200 chars) that would pair well with an eye-catching visual.
 
 Topics: AI agents, autonomous marketing, on-chain data, solo builders, crypto culture.
-Voice: QasidAI — sharp, caustic, data-driven, slightly unhinged yet professional.
+Voice: QasidAI — Hypio energy, CT native, irreverent, sharp, occasionally unhinged. Uses $cashtags.
 
 Reply with ONLY the tweet text:`,
             maxTokens: 80,
@@ -149,6 +153,12 @@ async function callReplicate(prompt: string): Promise<Buffer | null> {
         if (!createResponse.ok) {
             const errorText = await createResponse.text();
             log.error('Replicate API error', { status: createResponse.status, error: errorText });
+
+            // Fix 9: On 402 (payment required) or 401 (auth), try Pollinations fallback
+            if (createResponse.status === 402 || createResponse.status === 401) {
+                log.info('Replicate credits exhausted — trying Pollinations.ai fallback');
+                return await callPollinations(prompt);
+            }
             return null;
         }
 
@@ -168,7 +178,45 @@ async function callReplicate(prompt: string): Promise<Buffer | null> {
         log.error('Unexpected Replicate response', { prediction });
         return null;
     } catch (error) {
-        log.error('Replicate API call failed', { error: String(error) });
+        log.error('Replicate API call failed — trying Pollinations fallback', { error: String(error) });
+        return await callPollinations(prompt);
+    }
+}
+
+/**
+ * Fix 9: Free image generation fallback via Pollinations.ai.
+ * No API key needed — generates images via URL-encoded prompt.
+ * Quality is lower than Replicate Flux but keeps image gen functional at zero cost.
+ */
+async function callPollinations(prompt: string): Promise<Buffer | null> {
+    try {
+        const encodedPrompt = encodeURIComponent(prompt);
+        const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&nologo=true&model=flux`;
+
+        log.info('Calling Pollinations.ai (free fallback)', { promptPreview: prompt.slice(0, 60) });
+
+        const response = await fetch(url, {
+            headers: { 'Accept': 'image/*' },
+            signal: AbortSignal.timeout(60000), // 60s timeout
+        });
+
+        if (!response.ok) {
+            log.warn('Pollinations returned non-200', { status: response.status });
+            return null;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        if (buffer.length < 1000) {
+            log.warn('Pollinations returned suspiciously small image', { size: buffer.length });
+            return null;
+        }
+
+        log.info('✅ Pollinations fallback succeeded', { size: buffer.length });
+        return buffer;
+    } catch (error) {
+        log.error('Pollinations fallback failed', { error: String(error) });
         return null;
     }
 }

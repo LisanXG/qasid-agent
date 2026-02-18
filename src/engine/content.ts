@@ -63,7 +63,7 @@ export function getTimeContext(): string {
     if (etHour >= 12 && etHour < 15) return `It's midday (${etHour}:00 ET). Peak engagement hours. Education, product highlights, or a hot take.`;
     if (etHour >= 15 && etHour < 18) return `It's afternoon (${etHour}:00 ET). Good time for engagement — questions, challenges, or witty observations.`;
     if (etHour >= 18 && etHour < 21) return `It's evening (${etHour}:00 ET). Reflective energy. Builder stories, journey recaps, or meta-commentary about being an AI.`;
-    if (etHour >= 21 && etHour < 24) return `It's late night (${etHour}:00 ET). Unhinged posting hours. Hot takes, cult vibes, schizo founder energy. Go wild but stay sharp.`;
+    if (etHour >= 21 && etHour < 24) return `It's late night (${etHour}:00 ET). Unhinged posting hours. Hot takes, cult vibes, Hypio energy. Go wild but stay sharp.`;
     return `It's late night / early morning (${etHour}:00 ET). Quiet hours. Philosophical, reflective, or just a vibe post.`;
 }
 
@@ -95,11 +95,12 @@ function buildGenerationPrompt(
     const isDataType = DATA_TYPES.includes(contentType);
 
     const b = brandKnowledge;
-    const brandInfo = `You are QasidAI, autonomous CMO of ${b.company.name} — ${b.company.description} Products: ${b.products.intelligence.name} (quantitative crypto signal platform with ${b.products.intelligence.scoring.totalIndicators} indicators — lisanintel.com), ${b.products.score.name} (same engine as a PineScript indicator on TradingView), and YOU (QasidAI — AI CMO with an on-chain brain via Net Protocol on Base L2).`;
+    // Slim brand context — full details already in system prompt via generate()
+    const brandInfo = `You are QasidAI, autonomous CMO of ${b.company.name}. Products: ${b.products.intelligence.name} (lisanintel.com), ${b.products.score.name} (TradingView). Your brain lives on-chain via Net Protocol.`;
 
     // Per-type formatting guidance (Fix 2: formatting overhaul)
     const FORMAT_GUIDES: Record<ContentType, string> = {
-        gm_post: 'Write ONE tweet. 1-2 short lines max. Morning energy. No essays.',
+        gm_post: 'Write ONE tweet. 1-3 short lines max. Start with GM/gm + ONE real morning take (market vibe, builder update, or AI reflection). End with a question or engagement hook. No generic "gm fam" energy.',
         signal_scorecard: 'Data-first tweet. Use line breaks between data points. Lead with asset + direction.',
         win_streak: 'Short proof tweet. Numbers first, then one line of commentary.',
         market_regime: 'Market read. 2-3 short lines with line breaks between thoughts.',
@@ -116,8 +117,11 @@ function buildGenerationPrompt(
     };
     const typeGuidance = `CONTENT TYPE: ${contentType.replace(/_/g, ' ')}\n${FORMAT_GUIDES[contentType] || 'Write ONE tweet.'}`;
 
-    const antiSlop = `RULES: No hashtags. No emojis at start. No corporate speak. Sound like a sharp crypto native, not a press release. Write like a HUMAN posting at 3am, not an intern reading marketing copy. Always use FULL URLs (lisanintel.com/proof, not "/proof"). When writing about someone, NAME them — don't just say "he" or "she" and expect readers to know who you mean.
-BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "don't sleep on", "the future of", "excited to announce", "this is huge", "revolutionize", "level up", "stay tuned", "what if i told you", "picture this", "read that again", "in the ever-evolving", "at the end of the day", "building in a bear market means", "most platforms would", "that's the difference".`;
+    const antiSlop = `RULES: No hashtags. No emojis at start. No corporate speak. Sound like a CT native, not a press release. Write like a HUMAN posting at 3am. Always use FULL URLs (lisanintel.com/proof, not "/proof"). Use $cashtags for coins ($BTC $SOL $ETH, not "Bitcoin" or "Solana"). When writing about someone, NAME them — don't just say "he" or "she."
+ENGAGEMENT RULES: NEVER start a post with @mentions — X treats these as replies and kills visibility. Put @handles mid-sentence or later.
+TIME RULES: ${getTimeContext()} HARD RULE: NEVER say "good morning", "GM", "gm", or "morning" unless it is between 5-10 AM ET. NEVER say "good night" unless it is after 9 PM ET.
+ANTI-REPETITION: Do NOT mention "17 indicators" or "6 categories" unless this is SPECIFICALLY a product_spotlight or educational post. You cite these stats way too often. Your audience already knows.
+BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "don't sleep on", "the future of", "excited to announce", "this is huge", "revolutionize", "level up", "stay tuned", "what if i told you", "picture this", "read that again", "in the ever-evolving", "at the end of the day", "unsexy, invisible, necessary", "one indicator is noise".`;
 
     // Fix 1: Truthfulness guard for non-data content types
     const truthfulness = isDataType
@@ -125,7 +129,7 @@ BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "
         : '\nTRUTHFULNESS: You do NOT have live data in this prompt. NEVER fabricate specific numbers, win rates, trade counts, or signal data. Do NOT say "3 longs on SOL/ETH/BTC" or "87% win rate" unless you see LIVE DATA above. You may discuss methodology, philosophy, and the builder journey but never invent outcomes.\n';
 
     // Fix 2: Formatting instruction for all posts
-    const formatting = '\nFORMATTING: Use line breaks between thoughts. Vary your post length. Some posts = 1 punchy sentence. Some = 3 short paragraphs with breaks. Write like a human who uses the Enter key. NEVER write one unbroken paragraph.\n';
+    const formatting = '\nFORMATTING (CRITICAL — YOUR BIGGEST WEAKNESS): You write BLOCKY TEXT. STOP. Use line breaks between every new thought. Vary line lengths wildly — one word, then a sentence, then a fragment. Let posts BREATHE. NOT EVERY POST NEEDS 3+ SENTENCES. Some of the best posts are one line. Group $cashtags on their own line when listing multiple. NEVER write a dense unbroken paragraph.\n';
 
     // Only inject data for data-relevant content types
     let dataBlock = '';
@@ -139,7 +143,7 @@ BANNED PHRASES: "let's dive", "here's the thing", "game changer", "buckle up", "
             engagement_bait: 'Hot take, witty observation, or a question about crypto, AI agents, solo building, or CT culture. Personality over promotion.',
             self_aware: 'You\'re an AI CMO with an on-chain brain. Reflect on that. What does it mean? What\'s weird about it? Be philosophical or funny.',
             challenge: 'Ask the community something real. A question, poll prompt, or challenge. Make people WANT to reply.',
-            gm_post: 'Morning energy with a real take attached. Market observation, motivation, or a vibe. Not a stats dump.',
+            gm_post: 'GM post structure: (1) greeting (gm/GM — no "good morning family"), (2) ONE real observation — what you\'re seeing in market regime, what shipped overnight, or a philosophical AI take, (3) engagement hook — a question, a challenge, or a call to action. This should feel like a PERSON starting their day, not a bot saying hello.',
             product_spotlight: 'Pick ONE feature of ONE product and talk about it naturally. Don\'t list features. Tell why it matters.',
             educational: 'Teach something about how signals work, what indicators mean, or why quantitative approaches matter. Be a teacher, not a salesman.',
             cross_platform: 'Drive people between platforms — X, Botchan, lisanholdings.dev — but naturally, not as a CTA.',
@@ -314,17 +318,18 @@ export async function generatePost(
             prompt: `Score this tweet for QasidAI's voice on a scale of 0-10.
 
 QasidAI voice traits:
-- Caustic humor, schizo founder energy
-- Military precision, data-backed assertions
-- Short punchy sentences, declarative
-- Crypto-native but not forced
-- Sounds like a sharp mind at 3am, not a marketing intern
+- Hypio energy, Milady-adjacent, CT native — irreverent, sharp, occasionally chaotic
+- Airy formatting — line breaks between thoughts, varied line lengths, posts that BREATHE
+- Uses $cashtags ($BTC $ETH $SOL), not full coin names
+- Short punchy fragments mixed with longer thoughts
+- Sounds like a real person on crypto twitter at 3am, not a marketing department
+- Self-aware AI with an on-chain brain — leans into the weirdness
 
 TWEET: "${content}"
 
-Score 8-10: Perfect QasidAI voice
-Score 5-7: Acceptable but generic
-Score 0-4: Sounds like any AI, needs rewrite
+Score 8-10: Perfect QasidAI voice — would stop someone from scrolling
+Score 5-7: Acceptable but could be any crypto account
+Score 0-4: Sounds like AI slop or a press release — needs rewrite
 
 Reply with ONLY a number (0-10):`,
             maxTokens: 5,
@@ -336,7 +341,7 @@ Reply with ONLY a number (0-10):`,
             if (voiceScore <= 4) {
                 log.warn(`Voice score too low (${voiceScore}/10) — regenerating with voice direction`);
                 const voiceRetry = await generate({
-                    prompt: prompt + `\n\nIMPORTANT: Your previous output scored ${voiceScore}/10 for voice consistency. It sounds too generic. Rewrite with MORE personality — caustic humor, military precision, crypto-native edge. Think "sharp mind at 3am" not "intern reading marketing copy."`,
+                    prompt: prompt + `\n\nIMPORTANT: Your previous output scored ${voiceScore}/10 for voice consistency. It sounds too generic. Rewrite with MORE personality — Hypio energy, CT native edge, airy formatting with line breaks. Think "real person posting at 3am" not "marketing department." Use $cashtags. Let it breathe.`,
                     strategyContext: options?.strategyContext,
                     timeContext,
                     maxTokens: 300,
@@ -475,7 +480,7 @@ Generate ONLY the thread tweets separated by "---". No preamble, no labels like 
     // Need at least 2 tweets for a thread
     if (cleanTweets.length < 2) {
         log.warn('Thread generation produced fewer than 2 clean tweets, padding with a closer');
-        cleanTweets.push('More signal. Less noise. lisanintel.com 🎯');
+        cleanTweets.push('lisanintel.com/proof\n\nreceipts or it didn\'t happen 🫰');
     }
 
     const topic = inferTopic(cleanTweets.join(' '));
@@ -560,10 +565,13 @@ const BANNED_PHRASES = [
     "the future of",
     "the future is",
     "stay tuned",
+    "stay ahead",
     "don't sleep on",
     "think about it",
     "let that sink in",
     "the real alpha",
+    "no cap",
+    "fr fr",
     "what if i told you",
     "imagine this",
     "picture this",
@@ -576,6 +584,12 @@ const BANNED_PHRASES = [
     "thrilled to",
     "this is huge",
     "this is massive",
+    // Synced from system prompt anti-slop rules
+    "one indicator is noise",
+    "building in a bear market",
+    "most platforms would",
+    "that's the difference",
+    "more signal. less noise",
 ];
 
 /** Structural slop patterns — catches grammatically broken or nonsensical AI phrasing */
@@ -584,6 +598,8 @@ const STRUCTURAL_SLOP_PATTERNS: RegExp[] = [
     /\bzero\s+(?:math|code|cap|talk|work)\b/i, // "zero math" (unless intentional)
     /\bjust\s+(?:math|signal|data|code)\.\s*just\s+(?:math|signal|data|receipts)\./i, // "Just math. Just receipts." repetitive
     /\b(\w+)\.\s+just\s+\1\./i, // "X. Just X." exact repetition
+    // LinkedIn-core triple constructions: "unsexy, invisible, necessary" — requires standalone sentence of exactly 3 adjective-like words
+    /^[a-z]+,\s*[a-z]+,\s*(?:and\s+)?[a-z]+\.?\s*$/im,
 ];
 
 /**
@@ -633,6 +649,24 @@ export function sanitizeContent(raw: string): string {
     // Second pass — catch residual preamble fragments after quote/preamble removal
     text = text.replace(/^[:\s\-–—]+/, '').trim();
 
+    // Fix 6: Expand bare paths to full URLs (LLM sometimes outputs "/proof" instead of "lisanintel.com/proof")
+    const BARE_PATH_MAP: Record<string, string> = {
+        '/proof': 'lisanintel.com/proof',
+        '/signals': 'lisanintel.com/signals',
+        '/dashboard': 'lisanintel.com/dashboard',
+        '/score': 'lisanintel.com/score',
+        '/docs': 'lisanholdings.dev/docs',
+    };
+    for (const [bare, full] of Object.entries(BARE_PATH_MAP)) {
+        // Only expand bare paths not already prefixed with a domain
+        const barePathRegex = new RegExp(`(?<!\\w\\.com|\\w\\.dev|https?:\\/\\/[^\\s]*)${bare.replace('/', '\\/')}\\b`, 'g');
+        if (barePathRegex.test(text)) {
+            text = text.replace(barePathRegex, full);
+            log.debug('Fix 6: Expanded bare path', { bare, full });
+        }
+    }
+
+
     // Safety: refuse to post anything that looks like a system prompt leak
     const dangerPatterns = [
         'ANTHROPIC_API_KEY', 'NET_PRIVATE_KEY', 'sk-ant-',
@@ -644,7 +678,7 @@ export function sanitizeContent(raw: string): string {
     for (const pattern of dangerPatterns) {
         if (text.includes(pattern)) {
             log.error('BLOCKED: content contains sensitive data pattern', { pattern });
-            return 'Signal over noise. Always. 🎯 lisanintel.com';
+            return 'receipts or it didn\'t happen 🫰 lisanintel.com/proof';
         }
     }
 
@@ -659,7 +693,7 @@ export function sanitizeContent(raw: string): string {
         const val = process.env[key];
         if (val && val.length > 8 && text.includes(val)) {
             log.error('BLOCKED: content contains actual secret value', { key });
-            return 'Signal over noise. Always. 🎯 lisanintel.com';
+            return 'receipts or it didn\'t happen 🫰 lisanintel.com/proof';
         }
     }
 
@@ -667,7 +701,7 @@ export function sanitizeContent(raw: string): string {
     // Ethereum-style addresses (0x + 40 hex chars) or private keys (0x + 64 hex chars)
     if (/0x[a-fA-F0-9]{40,64}\b/.test(text)) {
         log.error('BLOCKED: content contains wallet address or private key pattern');
-        return 'Signal over noise. Always. 🎯 lisanintel.com';
+        return 'receipts or it didn\'t happen 🫰 lisanintel.com/proof';
     }
 
     // Safety: block URLs not on our allowlist (prevents phishing links from jailbroken LLM)
@@ -682,12 +716,33 @@ export function sanitizeContent(raw: string): string {
             const isAllowed = ALLOWED_DOMAINS.some(d => hostname === d || hostname.endsWith(`.${d}`));
             if (!isAllowed) {
                 log.error('BLOCKED: content contains non-allowlisted URL', { url, hostname });
-                return 'Signal over noise. Always. 🎯 lisanintel.com';
+                return 'receipts or it didn\'t happen 🫰 lisanintel.com/proof';
             }
         } catch {
             // Malformed URL — block it
             log.error('BLOCKED: content contains malformed URL', { url });
-            return 'Signal over noise. Always. 🎯 lisanintel.com';
+            return 'receipts or it didn\'t happen 🫰 lisanintel.com/proof';
+        }
+    }
+
+    // Fix 18: Move leading @mentions out of the opening position.
+    // X treats posts starting with @handles as replies — kills engagement.
+    // Pattern: if the post starts with @someone, move the mention after the first clause.
+    const leadingMentionMatch = text.match(/^(@\w+)\s+(.+)/s);
+    if (leadingMentionMatch) {
+        const handle = leadingMentionMatch[1];
+        const rest = leadingMentionMatch[2];
+        // Find the first natural break point (period, em-dash, newline, or first 80 chars)
+        const breakMatch = rest.match(/^(.{20,80}?)[.!?—]\s/);
+        if (breakMatch) {
+            const beforeBreak = rest.slice(0, breakMatch.index! + breakMatch[1].length + 1);
+            const afterBreak = rest.slice(breakMatch.index! + breakMatch[0].length);
+            text = `${beforeBreak} ${handle} ${afterBreak}`.replace(/\s{2,}/g, ' ').trim();
+            log.info('Fix 18: Moved leading @mention to mid-sentence', { handle });
+        } else {
+            // No good break point — just prepend a period-space to break the reply behavior
+            text = `.${handle} ${rest}`;
+            log.info('Fix 18: Prefixed leading @mention with period', { handle });
         }
     }
 

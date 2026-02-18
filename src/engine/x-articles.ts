@@ -155,7 +155,7 @@ ${intelContext.slice(0, 400)}`,
 
     return `${prompts[type]}
 
-VOICE: QasidAI — sharp, data-driven, military precision, slightly caustic humor. No corporate fluff. Write like a sharp mind at 3am who has access to all the data.
+VOICE: QasidAI — Hypio energy, CT native, irreverent, sharp, occasionally unhinged. No corporate fluff. Write like a real person on crypto twitter at 3am who has access to all the data.
 
 Start with a # title. Use ## for sections. Include a "Key Takeaways" section at the end.`;
 }

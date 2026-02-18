@@ -38,26 +38,47 @@ async function fetchFounderTweetsSyndication(): Promise<{ id: string; text: stri
 
         const html = await response.text();
 
-        // Parse tweet text from the syndication HTML
-        // The format is embedded tweet widgets with data attributes
+        // Parse tweet text from the syndication response
+        // Strategy: try JSON parse first (modern syndication), then regex fallback
         const tweets: { id: string; text: string }[] = [];
 
-        // Match tweet containers: each has a data-tweet-id and text content
-        // Pattern: look for tweet text between known HTML markers
-        const tweetRegex = /data-tweet-id="(\d+)"[^>]*>[\s\S]*?<p[^>]*class="[^"]*timeline-Tweet-text[^"]*"[^>]*>([\s\S]*?)<\/p>/gi;
-        let match;
-        while ((match = tweetRegex.exec(html)) !== null) {
-            const id = match[1];
-            // Strip HTML tags from tweet text
-            const text = match[2].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
-            if (id && text) {
-                tweets.push({ id, text });
+        // Approach 1: Try to extract embedded JSON data (modern X syndication)
+        try {
+            // Look for JSON data embedded in script tags or data attributes
+            const jsonMatches = html.match(/"tweet_results?"?\s*:\s*\{[^]*?"legacy"[^]*?\}/g)
+                ?? html.match(/"tweetId"\s*:\s*"\d+"[^]*?"text"\s*:\s*"[^"]*"/g);
+
+            if (jsonMatches) {
+                for (const jsonStr of jsonMatches) {
+                    const idMatch = jsonStr.match(/"(?:tweetId|id_str|rest_id)"\s*:\s*"(\d+)"/);
+                    const textMatch = jsonStr.match(/"(?:full_text|text)"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                    if (idMatch && textMatch) {
+                        const text = textMatch[1].replace(/\\n/g, ' ').replace(/\\"/g, '"').replace(/\\u[\da-f]{4}/gi, (m) => String.fromCharCode(parseInt(m.slice(2), 16))).trim();
+                        if (text) tweets.push({ id: idMatch[1], text });
+                    }
+                }
+            }
+        } catch {
+            log.debug('JSON extraction failed, trying regex fallback');
+        }
+
+        // Approach 2: Legacy HTML parsing (older syndication format)
+        if (tweets.length === 0) {
+            const tweetRegex = /data-tweet-id="(\d+)"[^>]*>[\s\S]*?<p[^>]*class="[^"]*(?:timeline-Tweet-text|tweet-text)[^"]*"[^>]*>([\s\S]*?)<\/p>/gi;
+            let match;
+            while ((match = tweetRegex.exec(html)) !== null) {
+                const id = match[1];
+                const text = match[2].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+                if (id && text) {
+                    tweets.push({ id, text });
+                }
             }
         }
 
-        // Fallback: try alternative HTML structure (X changes these periodically)
+        // Approach 3: Broad JSON key-value scan (last resort)
         if (tweets.length === 0) {
             const altRegex = /"tweetId":"(\d+)"[\s\S]*?"text":"((?:[^"\\]|\\.)*)"/gi;
+            let match;
             while ((match = altRegex.exec(html)) !== null) {
                 const id = match[1];
                 const text = match[2].replace(/\\n/g, ' ').replace(/\\"/g, '"').trim();

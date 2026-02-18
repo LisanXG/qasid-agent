@@ -3,6 +3,7 @@ import { sanitizeContent } from './content.js';
 import { searchRecentTweets, replyToTweet, type SearchResult } from '../platforms/x.js';
 import { gatherIntelContext } from '../data/intelligence.js';
 import { hasRepliedTo, recordReply } from './reply-tracker.js';
+import { recordAction } from './daily-budget.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
 import { config } from '../config.js';
@@ -217,6 +218,13 @@ export async function runTimelineScan(): Promise<number> {
                     author: candidate.authorUsername,
                     reply: replyText.slice(0, 80),
                 });
+
+                // Reserve budget BEFORE posting (integrates with daily-budget.ts)
+                const budgetOk = await recordAction('reply', `Scanner reply to @${candidate.authorUsername}: ${replyText.slice(0, 60)}`);
+                if (!budgetOk) {
+                    log.info('Budget exhausted — stopping timeline scan');
+                    break;
+                }
 
                 const replyId = await replyToTweet(candidate.id, replyText);
 

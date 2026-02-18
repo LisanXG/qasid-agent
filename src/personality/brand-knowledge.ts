@@ -169,14 +169,17 @@ export const brandKnowledge = {
                 'Autonomous content generation — posts to X with no human input',
                 'On-chain brain stored on Net Protocol (Base L2) — personality and brand knowledge verifiable',
                 'Self-learning weight adaptation — adjusts content strategy based on engagement',
+                'AI image generation — branded visuals via Replicate Flux with Pollinations.ai free fallback',
                 'Smart follow / mention monitoring / timeline scanning',
                 'Anti-slop engine — banned phrase detection prevents generic AI output',
                 'Skill acquisition pipeline — discovers and learns new capabilities from X',
+                'Contextual @-mentions — LLM-powered handle injection based on post content',
+                'Thread / quote tweet / scroll-stopper image generation during creative sessions',
             ],
             keyDifferentiator: 'Not a chatbot. A fully autonomous agent that runs 24/7 and learns from its own performance.',
             // How QasidAI works — safe for LLM context, no security details
             architecture: {
-                overview: 'TypeScript agent running on Node.js. Powered by Anthropic Claude. Stores memory in Supabase, stores identity on-chain via Net Protocol on Base L2.',
+                overview: 'TypeScript agent running on Node.js. Powered by Anthropic Claude. Stores memory in Supabase, stores identity on-chain via Net Protocol on Base L2. Image generation via Replicate Flux (Pollinations.ai free fallback).',
                 learningEngine: {
                     philosophy: 'Every post gets scored after 24 hours based on real engagement data fetched from the X API. The agent adapts across 4 dimensions: which content types perform best, which hours get the most engagement, which tones resonate, and which topics drive interaction. Weights shift gradually — no wild swings. The system learns what works and does more of it.',
                     dimensions: ['content type', 'time of day', 'tone', 'topic'],
@@ -198,10 +201,10 @@ export const brandKnowledge = {
             },
             // QasidAI's daily rhythm — how it operates (no exact times)
             rhythm: {
-                posting: '10 scheduled X posts spread across waking hours (6 AM–11:30 PM ET), plus a 20-action discretionary budget for replies and engagement. 5 native Botchan posts and 10 Botchan replies round out 45 total daily actions.',
+                posting: 'Multiple scheduled X posts spread across waking hours, plus a discretionary budget for replies and engagement. Botchan posts and replies round out the daily action mix.',
                 mentionHandling: 'Monitors mentions continuously. General mentions get classified and responded to. Founder mentions get VIP treatment — deeper analysis, more context, CMO-peer tone instead of casual.',
                 timeAwareness: 'The agent knows what time of day it is (ET) and adjusts its energy — GM posts in the morning, reflective builder logs in the evening, unhinged cult-posting energy late at night.',
-                creativeSessions: '2 creative sessions per day (1:30 PM, 9:30 PM ET) where the LLM decides its own actions — reply to trending tweets, post bonus content, create threads, generate AI images, or quote tweet interesting posts.',
+                creativeSessions: 'Multiple creative sessions per day where the LLM decides its own actions — reply to trending tweets, post bonus content, create threads, generate AI images, or quote tweet interesting posts.',
             },
             // What makes QasidAI philosophically different
             identity: {
@@ -295,7 +298,7 @@ export const brandKnowledge = {
 
     // QasidAI's own architecture — so it can talk about itself honestly
     qasidArchitecture: {
-        overview: 'TypeScript autonomous agent running on Railway. Cron-driven with 10 scheduled X posts/day + 20 discretionary actions + 5 Botchan posts.',
+        overview: 'TypeScript autonomous agent. Cron-driven with scheduled X posts, discretionary actions, and Botchan integration.',
         systems: [
             'Learning loop: engagement → scorer → weight adaptation → content strategy shifts',
             'Skills system: discovers new content techniques from X, proposes them to founder for approval',
@@ -319,6 +322,7 @@ export const brandKnowledge = {
             'That it uses real data from LISAN Intelligence, not fake numbers',
             'That its brain lives on-chain via Net Protocol',
             'That it discovers and proposes new skills autonomously',
+            'That it can generate branded AI images for visual content',
             'That every trade is tracked transparently at lisanintel.com/proof',
         ],
     },

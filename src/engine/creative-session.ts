@@ -126,10 +126,16 @@ Reply with ONLY the tweet text (or "SKIP"):`,
         if (reply.toUpperCase().startsWith('SKIP') || reply.length < 5) continue;
         reply = sanitizeContent(reply);
 
+        // Reserve budget BEFORE posting (consistent with executeReplyTrending)
+        const budgetOk = await recordAction('mention_response', `Reply to @${mention.authorUsername}: ${reply.slice(0, 60)}`);
+        if (!budgetOk) {
+            log.warn('Budget reservation failed — skipping mention reply');
+            continue;
+        }
+
         const replyId = await replyToTweet(mention.id, reply);
         if (replyId) {
             await recordReply(mention.id, mention.authorUsername ?? mention.authorId, replyId, reply, 'creative-mention');
-            await recordAction('mention_response', `Responded to @${mention.authorUsername}: ${reply.slice(0, 60)}`, replyId);
             log.info('✅ Creative mention response', { target: mention.id, author: mention.authorUsername });
             return true;
         }
@@ -259,7 +265,7 @@ async function executeQuoteTweet(intelContext: string): Promise<boolean> {
 TWEET by @${tweet.authorUsername ?? 'unknown'}: "${sanitizeUserInput(tweet.text)}"
 Likes: ${tweet.metrics?.like_count ?? 0} | Quotes: ${tweet.metrics?.quote_count ?? 0}
 
-Draft sharp quote tweet commentary (under 280 chars). Add your own perspective — agree, disagree, expand, or offer a contrarian take. Reference Lisan Holdings' experience if relevant. If this tweet isn't worth quoting, respond with just "SKIP".
+Draft sharp quote tweet commentary (under 500 chars — we have X Premium). Add your own perspective — agree, disagree, expand, or offer a contrarian take. Reference Lisan Holdings' experience if relevant. If this tweet isn't worth quoting, respond with just "SKIP".
 
 MARKET CONTEXT: ${intelContext.slice(0, 300)}
 
@@ -308,7 +314,7 @@ MARKET CONTEXT: ${intelContext.slice(0, 300)}
 
 Rules:
 - Make it a REAL question, not rhetorical
-- Keep it under 280 chars
+- Keep it under 500 chars (we have X Premium)
 - Don't tag anyone — let the question stand on its own
 - Make people want to reply
 - Don't sound like a survey
@@ -379,7 +385,7 @@ export async function runCreativeSession(): Promise<number> {
 
     // Ask the LLM to plan this session
     const planResult = await generate({
-        prompt: `You are QasidAI, autonomous CMO of Lisan Holdings. You have a daily budget of 20 discretionary actions (beyond your 10 scheduled posts). You're deciding what to do right now.
+        prompt: `You are QasidAI, autonomous CMO of Lisan Holdings. You have a discretionary action budget each day (beyond your scheduled posts). You're deciding what to do right now.
 
 CURRENT BUDGET:
 ${budgetSummary}

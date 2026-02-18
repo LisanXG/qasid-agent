@@ -137,6 +137,8 @@ export async function scoreOldPosts(): Promise<number> {
     for (const post of posts) {
         const reactions = post.reactions ?? 0;
         const replies = post.replies ?? 0;
+        // Fix 12: Column `link_clicks` is a legacy misnomer — it actually stores impression count.
+        // Renaming the DB column would break existing data, so we document the mapping here.
         const impressions = post.link_clicks ?? 0;
         const contentType = post.content_type ?? 'unknown';
         const hoursOld = post.posted_at

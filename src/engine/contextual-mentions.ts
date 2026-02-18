@@ -9,7 +9,10 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('Mentions');
 
-// Fix 10: Per-post cooldown — track how many posts since last mention
+// Fix 10: Per-post cooldown — track how many posts since last mention.
+// Fix 13: TRADEOFF: This counter resets on process restart (Railway redeploy).
+// Worst case: one extra mention after a restart. Acceptable vs adding DB state
+// for such a minor cosmetic concern. If it becomes an issue, persist to Supabase.
 let postsSinceLastMention = 0;
 
 /**
@@ -307,7 +310,9 @@ export function handleify(content: string): string {
     for (const { pattern, handle } of followingCache) {
         if (mentionCount >= MAX_MENTIONS) break;
         const atHandle = `@${handle}`;
-        if (result.includes(atHandle)) continue;
+        // Fix 14: Check both @handle and bare handle to prevent duplicates
+        // (addContextualMentions may have already inserted the @handle)
+        if (result.includes(atHandle) || result.toLowerCase().includes(handle.toLowerCase())) continue;
         const newResult = result.replace(pattern, atHandle);
         if (newResult !== result) {
             result = newResult;

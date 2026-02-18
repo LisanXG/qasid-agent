@@ -122,6 +122,9 @@ export async function fetchAndUpdateEngagement(): Promise<number> {
         if (!post) continue;
 
         try {
+            // Fix 12: Column name mapping (legacy misnomers — renaming would break data):
+            //   reactions (DB) ← like_count (X API)
+            //   link_clicks (DB) ← impression_count (X API)
             await updatePostMetrics({
                 postId: post.id,
                 reactions: metrics.like_count,

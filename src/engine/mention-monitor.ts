@@ -6,6 +6,8 @@ import { hasRepliedTo, recordReply, getLastMentionId, saveLastMentionId } from '
 import { addKnowledge, deactivateByKeyword } from './dynamic-knowledge.js';
 import { supabase } from '../supabase.js';
 import { createLogger } from '../logger.js';
+import { config } from '../config.js';
+import { isNetConfigured } from '../config.js';
 import { processSkillApproval, discoverSkillFromContent } from '../skills/skill-manager.js';
 
 // ============================================================================
@@ -35,6 +37,28 @@ const MAX_MENTION_AGE_MS = 6 * 60 * 60 * 1000;
 /** In-memory set of founder mention IDs already processed this session.
  *  Prevents re-evaluating the same mentions every 15-min cron cycle. */
 const processedFounderMentionIds = new Set<string>();
+
+/**
+ * Build a dynamic capability state string so the LLM knows what QasidAI can actually do.
+ * Prevents embarrassing "that's not in my toolkit" replies when it IS configured.
+ */
+function getCapabilityState(): string {
+    const caps: string[] = [
+        '✅ Autonomous X posting (scheduled posts + creative sessions)',
+        '✅ Live market data via LISAN Intelligence API',
+        '✅ Mention monitoring & contextual replies',
+        '✅ Thread generation',
+        '✅ Smart follow (engagement-based)',
+        '✅ Timeline scanning & proactive engagement',
+    ];
+    caps.push(config.REPLICATE_API_TOKEN
+        ? '✅ AI image generation (Replicate Flux — operational)'
+        : '❌ AI image generation (Replicate not configured)');
+    caps.push(isNetConfigured
+        ? '✅ On-chain brain via Net Protocol (Base L2 — operational)'
+        : '❌ On-chain brain (Net Protocol not configured)');
+    return `YOUR CURRENT CAPABILITIES (use this to answer questions about what you can do):\n${caps.join('\n')}`;
+}
 
 /**
  * Count mention responses in the last 24h (safety limit).
@@ -117,7 +141,9 @@ YOUR TASK:
    - Never sounds corporate or automated
 
 LIVE MARKET CONTEXT (use if relevant):
-${intelContext.slice(0, 400)}${threadContext}
+${intelContext.slice(0, 400)}
+
+${getCapabilityState()}${threadContext}
 
 RESPOND IN EXACTLY THIS FORMAT:
 TYPE: QUESTION | ENGAGE | SPAM | SHILL
@@ -193,6 +219,8 @@ THE TAG:
 ${mention.inReplyToUserId ? '(Tagged you in someone else\'s thread)' : '(Direct tag)'}${threadContext}
 
 You're QasidAI — CMO of Lisan Holdings. You know your stack: LISAN Intelligence signals, on-chain brain via Net Protocol, anti-slop engine.
+
+${getCapabilityState()}
 
 Respond like a sharp CMO. Be concise if the situation is simple, be detailed only if the content genuinely warrants analysis. Match the energy of what's being shared:
 - Quick observation? One or two sentences is fine.
@@ -283,8 +311,17 @@ export async function runMentionMonitor(): Promise<number> {
     let responded = 0;
     let highestId = sinceId;
 
+    // Fix 10: Track skip reasons for end-of-cycle summary
+    const skipReasons: Record<string, number> = {
+        already_replied: 0, stale: 0, founder_vip: 0,
+        llm_skip: 0, race_guard: 0, budget_exhausted: 0,
+    };
+
     for (const mention of mentions) {
-        if (responded >= remainingBudget) break;
+        if (responded >= remainingBudget) {
+            skipReasons.budget_exhausted++;
+            break;
+        }
 
         // Track highest ID for watermark
         if (!highestId || mention.id > highestId) {
@@ -294,6 +331,7 @@ export async function runMentionMonitor(): Promise<number> {
         // Skip if already responded
         if (await hasRepliedTo(mention.id)) {
             log.debug('Already responded to mention', { tweetId: mention.id });
+            skipReasons.already_replied++;
             continue;
         }
 
@@ -302,6 +340,7 @@ export async function runMentionMonitor(): Promise<number> {
             const mentionAge = Date.now() - new Date(mention.createdAt).getTime();
             if (mentionAge > MAX_MENTION_AGE_MS) {
                 log.debug('Skipping stale mention', { tweetId: mention.id, ageHours: (mentionAge / 3600000).toFixed(1) });
+                skipReasons.stale++;
                 continue;
             }
         }
@@ -332,17 +371,22 @@ export async function runMentionMonitor(): Promise<number> {
         // (prevents double-reply: general + VIP responding to the same tweet)
         if (mention.authorUsername?.toLowerCase() === 'lisantherealone') {
             log.debug('Skipping founder mention (handled by VIP monitor)', { tweetId: mention.id });
+            skipReasons.founder_vip++;
             continue;
         }
 
         // Draft a response
         const replyText = await draftMentionResponse(mention, intelContext);
-        if (!replyText) continue;
+        if (!replyText) {
+            skipReasons.llm_skip++;
+            continue;
+        }
 
         // Pre-reply dedup guard: re-check right before posting to prevent
         // race condition with founder monitor processing the same mention
         if (await hasRepliedTo(mention.id)) {
             log.debug('Mention already handled (race guard)', { tweetId: mention.id });
+            skipReasons.race_guard++;
             continue;
         }
 
@@ -378,8 +422,13 @@ export async function runMentionMonitor(): Promise<number> {
         log.debug('Updated mention watermark', { sinceId: highestId });
     }
 
+    // Fix 10: Log end-of-cycle summary with skip reasons
+    const activeSkips = Object.entries(skipReasons).filter(([, v]) => v > 0);
     log.info(`Mention monitor complete: ${responded}/${mentions.length} mentions responded to`, {
         dailyTotal: recentCount + responded,
+        skipReasons: activeSkips.length > 0
+            ? Object.fromEntries(activeSkips)
+            : 'none',
     });
 
     return responded;

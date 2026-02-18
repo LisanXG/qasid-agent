@@ -604,9 +604,9 @@ export function startScheduler(): void {
     activeTasks.push(githubMonitor);
     log.info('🐙 GitHub org monitor active (daily 4:30 AM ET)');
 
-    // ---- Auto Brain Sync to Net Protocol (daily at 3:00 AM ET) ----
+    // ---- Auto Brain Sync to Net Protocol (daily at 3:15 AM ET — staggered from smartFollow at 3:00) ----
     if (isNetConfigured) {
-        const brainSync = cron.schedule('0 3 * * *', async () => {
+        const brainSync = cron.schedule('15 3 * * *', async () => {
             log.info('🧠 Auto brain sync starting...');
             try {
                 const personality = buildSystemPrompt();

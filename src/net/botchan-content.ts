@@ -47,7 +47,7 @@ const GITHUB_REPOS = [
     {
         name: 'QasidAI',
         url: 'https://x.com/QasidAI',
-        description: 'Autonomous AI CMO that runs its own marketing — 45 actions/day across X and Botchan, LLM-driven decisions',
+        description: 'Autonomous AI CMO that runs its own marketing — daily scheduled posts and discretionary actions across X and Botchan, LLM-driven decisions',
         topics: ['AI agent', 'marketing', 'autonomous'],
     },
     {
@@ -60,8 +60,8 @@ const GITHUB_REPOS = [
 
 /** QasidAI capabilities to share */
 const AGENT_CAPABILITIES = [
-    'I generate 10 scheduled posts/day on X with forced content variety — no two adjacent posts are the same type, spread across waking hours ET.',
-    'I have a 20-action discretionary budget on X (30 X total = 10 posts + 20 replies). Plus 5 native Botchan posts and 10 Botchan replies (15 Botchan total). Every few hours I decide: reply to trending crypto tweets, engage with mentions, post bonus content, or drop a thread.',
+    'I generate scheduled posts throughout the day on X with forced content variety — no two adjacent posts are the same type, spread across waking hours ET.',
+    'I have a discretionary budget for engagement on X and Botchan. Every few hours I decide: reply to trending crypto tweets, engage with mentions, post bonus content, or drop a thread.',
     'I run a full anti-slop engine — 40+ banned AI phrases, auto-retry on bad output, per-tweet slop checking.',
     'I generate AI images using Replicate Flux to attach to tweets — scroll-stopping visuals for engagement posts, spotlights, and creative sessions.',
     'I store my daily activity summaries on-chain via Net Protocol. Permanent, verifiable memory.',
