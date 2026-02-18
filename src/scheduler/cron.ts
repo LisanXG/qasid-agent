@@ -43,6 +43,71 @@ const log = createLogger('Scheduler');
 
 const activeTasks: cron.ScheduledTask[] = [];
 
+// ---- Image Posting Counter ----
+// Deterministic 1-in-3 image rate: every 3rd scheduled X post attempts an AI image.
+// Resets on successful image post. Does NOT reset on failure (retries next post).
+let postsSinceLastImage = 0;
+
+/**
+ * Attempt to post a tweet with an AI-generated image.
+ * Returns the external tweet ID if successful, null if image gen fails.
+ * On failure, the caller should fall back to text-only posting.
+ */
+async function tryPostWithImage(
+    content: string,
+    contentType: string,
+): Promise<string | null> {
+    try {
+        const { generateContentImage, isImageGenConfigured } = await import('../engine/image-gen.js');
+        if (!isImageGenConfigured()) {
+            log.warn('Image gen not configured — skipping image');
+            return null;
+        }
+        const image = await generateContentImage(content, contentType);
+        if (!image) {
+            log.warn('Image generation returned null — falling back to text-only');
+            return null;
+        }
+        const externalId = await postTweetWithImage(content, image.buffer, image.mimeType);
+        if (externalId) {
+            postsSinceLastImage = 0; // Reset counter on success
+            log.info(`🖼️ Image posted successfully`, { contentType, imageSize: image.buffer.length });
+        }
+        return externalId;
+    } catch (imgError) {
+        log.warn('AI image generation failed, falling back to text-only', { error: String(imgError) });
+        return null;
+    }
+}
+
+/**
+ * Post a generated post to X, with or without an image based on the 1-in-3 counter.
+ * Handles image attempt, text-only fallback, and memory save.
+ * Returns the external tweet ID.
+ */
+async function postWithImageCycle(
+    post: { content: string; contentType: string },
+): Promise<string | null> {
+    postsSinceLastImage++;
+    const shouldTryImage = postsSinceLastImage >= 3;
+
+    if (shouldTryImage) {
+        log.info(`🖼️ Image cycle triggered (${postsSinceLastImage} posts since last image)`, {
+            contentType: post.contentType,
+        });
+        const imageId = await tryPostWithImage(post.content, post.contentType);
+        if (imageId) {
+            return imageId;
+        }
+        // Image failed — post text-only but DON'T reset counter (try again next post)
+        log.info('Image attempt failed — posting text-only, will retry image next post');
+    }
+
+    // Text-only post (default path or image fallback)
+    const externalId = await postTweet(post.content);
+    return externalId;
+}
+
 /**
  * Run a single content cycle: generate + post to X + save to memory.
  */
@@ -95,7 +160,7 @@ async function runContentCycle(options?: {
                     log.warn('Budget reservation failed on dedup fallback — skipping post');
                     return;
                 }
-                const externalId = await postTweet(fallback.content);
+                const externalId = await postWithImageCycle(fallback);
                 await savePost(fallback, externalId ?? undefined);
                 log.info(`✅ Content cycle (dedup fallback): ${fallback.contentType} → X`);
                 return;
@@ -106,7 +171,7 @@ async function runContentCycle(options?: {
                 log.warn('Budget reservation failed — skipping post');
                 return;
             }
-            const externalId = await postTweet(retry.content);
+            const externalId = await postWithImageCycle(retry);
             await savePost(retry, externalId ?? undefined);
             log.info(`✅ Content cycle (dedup retry): ${retry.contentType} → X`);
             return;
@@ -119,31 +184,8 @@ async function runContentCycle(options?: {
             return;
         }
 
-        // Try AI image for visual content types (~40% of eligible types)
-        const IMAGE_ELIGIBLE_TYPES = ['engagement_bait', 'self_aware', 'product_spotlight', 'challenge', 'market_regime'];
-        const shouldTryImage = IMAGE_ELIGIBLE_TYPES.includes(post.contentType) && Math.random() < 0.4;
-
-        if (shouldTryImage) {
-            try {
-                const { generateContentImage, isImageGenConfigured } = await import('../engine/image-gen.js');
-                if (isImageGenConfigured()) {
-                    const image = await generateContentImage(post.content, post.contentType);
-                    if (image) {
-                        const externalId = await postTweetWithImage(post.content, image.buffer, image.mimeType);
-                        await savePost(post, externalId ?? undefined);
-                        log.info(`✅ Content cycle (with AI image): ${post.contentType} → X 🖼️`, {
-                            contentLength: post.content.length,
-                        });
-                        return;
-                    }
-                }
-            } catch (imgError) {
-                log.warn('AI image generation failed, posting text-only', { error: String(imgError) });
-            }
-        }
-
-        // Post text-only (default path or image fallback)
-        const externalId = await postTweet(post.content);
+        // Post with 1-in-3 image cycle (handles image attempt + text fallback)
+        const externalId = await postWithImageCycle(post);
 
         // Save to memory
         await savePost(post, externalId ?? undefined);
